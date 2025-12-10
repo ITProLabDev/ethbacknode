@@ -1,4 +1,9 @@
-# ethbacknode
+# EthBackNode
+
+![Go](https://img.shields.io/badge/Go-1.20%2B-00ADD8?logo=go&logoColor=white)
+![License](https://img.shields.io/badge/License-GPLv3-blue)
+![JSON-RPC](https://img.shields.io/badge/API-JSON--RPC%202.0-blue)
+
 
 **Backend microservice for interacting with Ethereum nodes, including transaction monitoring and transfers.**
 
