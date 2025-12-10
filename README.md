@@ -115,6 +115,26 @@ Configuration examples will be added as the project evolves.
 - Mnemonic phrases and private keys must be handled securely
 - Signing endpoints should never be publicly exposed
 
+## TODO
+
+- **Configuration via environment variables**
+    - Define all runtime options (RPC endpoint, log level, DB/queue endpoints, service IDs, etc.) via `ETHBACKNODE_*` env vars.
+    - Provide a `.env.example` with sane defaults and short comments.
+    - Document precedence rules (env vars vs config file / flags).
+
+- **Token-based authentication**
+    - Add optional API token verification for JSON-RPC requests.
+    - Support passing tokens via HTTP header (e.g. `Authorization: Bearer <token>`) and/or query params.
+    - Implement token revocation / rotation strategy and basic rate limiting hooks.
+
+- **Continuous Integration (CI)**
+    - Set up GitHub Actions workflow:
+        - `go test ./...` on push / PR.
+        - `golangci-lint` (or similar) for static analysis.
+        - Build and publish tagged Docker images to a registry.
+    - Add status badges (build, tests, lint) to `README.md`.
+
+
 # ethbacknode JSON-RPC 2.0 API
 
 ## API Overview
