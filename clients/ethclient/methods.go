@@ -1,10 +1,10 @@
 package ethclient
 
 import (
-	"backnode/clients/urpc"
-	"backnode/common/hexnum"
-	"backnode/tools/log"
 	"math/big"
+	"module github.com/ITProLabDev/ethbacknode/clients/urpc"
+	"module github.com/ITProLabDev/ethbacknode/common/hexnum"
+	"module github.com/ITProLabDev/ethbacknode/tools/log"
 )
 
 const (

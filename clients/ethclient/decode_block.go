@@ -1,10 +1,10 @@
 package ethclient
 
 import (
-	"backnode/abi"
-	"backnode/tools/log"
-	"backnode/types"
 	"errors"
+	"module github.com/ITProLabDev/ethbacknode/abi"
+	"module github.com/ITProLabDev/ethbacknode/tools/log"
+	"module github.com/ITProLabDev/ethbacknode/types"
 )
 
 func (c *Client) blockDecode(block *Block) (blockInfo *types.BlockInfo, err error) {

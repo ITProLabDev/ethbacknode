@@ -1,11 +1,11 @@
 package endpoint
 
 import (
-	"backnode/tools/log"
 	"bytes"
 	"encoding/json"
 	"errors"
 	"github.com/valyala/fasthttp"
+	"module github.com/ITProLabDev/ethbacknode/tools/log"
 	"runtime/debug"
 	"strings"
 )

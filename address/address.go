@@ -1,12 +1,12 @@
 package address
 
 import (
-	"backnode/crypto"
-	"backnode/crypto/secp256k1"
 	"bytes"
 	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/gob"
+	"module github.com/ITProLabDev/ethbacknode/crypto"
+	"module github.com/ITProLabDev/ethbacknode/crypto/secp256k1"
 )
 
 type Address struct {

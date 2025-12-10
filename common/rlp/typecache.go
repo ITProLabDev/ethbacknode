@@ -17,8 +17,8 @@
 package rlp
 
 import (
-	"backnode/common/rlp/internal/rlpstruct"
 	"fmt"
+	"module github.com/ITProLabDev/ethbacknode/common/rlp/internal/rlpstruct"
 	"reflect"
 	"sync"
 	"sync/atomic"

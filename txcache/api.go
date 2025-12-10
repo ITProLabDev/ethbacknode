@@ -1,9 +1,9 @@
 package txcache
 
 import (
-	"backnode/tools/log"
-	"backnode/types"
 	"github.com/timshannon/badgerhold"
+	"module github.com/ITProLabDev/ethbacknode/tools/log"
+	"module github.com/ITProLabDev/ethbacknode/types"
 	"sort"
 )
 

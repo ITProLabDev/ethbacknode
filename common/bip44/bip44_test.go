@@ -1,11 +1,11 @@
 package bip44_test
 
 import (
-	"backnode/common/bip32"
-	"backnode/common/bip39"
+	"module github.com/ITProLabDev/ethbacknode/common/bip32"
+	"module github.com/ITProLabDev/ethbacknode/common/bip39"
 	"testing"
 
-	. "backnode/common/bip44"
+	. "module github.com/ITProLabDev/ethbacknode/common/bip44"
 )
 
 func TestNewKeyFromMnemonic(t *testing.T) {

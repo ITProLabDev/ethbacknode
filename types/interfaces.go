@@ -1,8 +1,8 @@
 package types
 
 import (
-	"backnode/address"
 	"math/big"
+	"module github.com/ITProLabDev/ethbacknode/address"
 )
 
 type ChainClientInfo interface {

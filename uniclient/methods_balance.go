@@ -1,8 +1,8 @@
 package uniclient
 
 import (
-	"backnode/tools/log"
 	"encoding/json"
+	"module github.com/ITProLabDev/ethbacknode/tools/log"
 )
 
 func (c *Client) BalanceGetForAddress(address string, symbol string) (balance string, err error) {

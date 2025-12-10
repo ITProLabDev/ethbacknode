@@ -1,10 +1,10 @@
 package main
 
 import (
-	"backnode/storage"
-	"backnode/tools/log"
 	"encoding/json"
 	"errors"
+	"module github.com/ITProLabDev/ethbacknode/storage"
+	"module github.com/ITProLabDev/ethbacknode/tools/log"
 )
 
 var (

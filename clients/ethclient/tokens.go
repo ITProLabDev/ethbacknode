@@ -1,7 +1,7 @@
 package ethclient
 
 import (
-	"backnode/types"
+	"module github.com/ITProLabDev/ethbacknode/types"
 	"strings"
 )
 

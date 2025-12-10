@@ -1,8 +1,8 @@
 package ethclient
 
 import (
-	"backnode/common/hexnum"
 	"math/big"
+	"module github.com/ITProLabDev/ethbacknode/common/hexnum"
 )
 
 func (c *Client) ContractGetBalanceOf(contractAddress, address string) (balance *big.Int, err error) {

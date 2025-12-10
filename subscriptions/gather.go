@@ -1,8 +1,8 @@
 package subscriptions
 
 import (
-	"backnode/address"
-	"backnode/tools/log"
+	"module github.com/ITProLabDev/ethbacknode/address"
+	"module github.com/ITProLabDev/ethbacknode/tools/log"
 )
 
 func (s *Manager) gatherNativeCoinToMaster(address *address.Address, txInfo *TransferNotification) {

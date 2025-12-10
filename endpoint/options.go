@@ -1,8 +1,8 @@
 package endpoint
 
 import (
-	"backnode/tools/log"
 	"golang.org/x/crypto/ssh"
+	"module github.com/ITProLabDev/ethbacknode/tools/log"
 	"net"
 	"strconv"
 )

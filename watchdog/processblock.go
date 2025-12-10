@@ -1,6 +1,6 @@
 package watchdog
 
-import "backnode/tools/log"
+import "module github.com/ITProLabDev/ethbacknode/tools/log"
 
 func (w *Service) processBlock(blockNum int64) (err error) {
 	if w.config.Debug {

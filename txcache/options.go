@@ -1,6 +1,6 @@
 package txcache
 
-import "backnode/storage"
+import "module github.com/ITProLabDev/ethbacknode/storage"
 
 func WithConfigStorage(storage storage.BinStorage) ManagerOption {
 	return func(s *Manager) error {

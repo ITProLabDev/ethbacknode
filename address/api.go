@@ -1,8 +1,8 @@
 package address
 
 import (
-	"backnode/common/hexnum"
-	"backnode/crypto"
+	"module github.com/ITProLabDev/ethbacknode/common/hexnum"
+	"module github.com/ITProLabDev/ethbacknode/crypto"
 )
 
 func (p *Manager) IsAddressKnown(address string) bool {

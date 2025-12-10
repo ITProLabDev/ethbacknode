@@ -1,10 +1,10 @@
 package ethclient
 
 import (
-	"backnode/abi"
-	"backnode/clients/urpc"
-	"backnode/storage"
 	"fmt"
+	"module github.com/ITProLabDev/ethbacknode/abi"
+	"module github.com/ITProLabDev/ethbacknode/clients/urpc"
+	"module github.com/ITProLabDev/ethbacknode/storage"
 )
 
 func WithRpcClient(nodeAddress, nodePort string, useSSL bool, headers map[string]string) Option {

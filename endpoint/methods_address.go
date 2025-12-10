@@ -1,12 +1,12 @@
 package endpoint
 
 import (
-	"backnode/address"
-	"backnode/common/hexnum"
-	"backnode/subscriptions"
-	"backnode/tools/log"
 	"bytes"
 	"errors"
+	"module github.com/ITProLabDev/ethbacknode/address"
+	"module github.com/ITProLabDev/ethbacknode/common/hexnum"
+	"module github.com/ITProLabDev/ethbacknode/subscriptions"
+	"module github.com/ITProLabDev/ethbacknode/tools/log"
 )
 
 func (r *BackRpc) rpcProcessAddressSubscribe(ctx RequestContext, request RpcRequest, response RpcResponse) {

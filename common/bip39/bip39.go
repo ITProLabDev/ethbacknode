@@ -5,7 +5,6 @@
 package bip39
 
 import (
-	"backnode/common/bip39/wordlists"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/sha512"
@@ -13,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"module github.com/ITProLabDev/ethbacknode/common/bip39/wordlists"
 	"strings"
 
 	"golang.org/x/crypto/pbkdf2"

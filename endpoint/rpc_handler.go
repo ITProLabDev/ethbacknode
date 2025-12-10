@@ -1,12 +1,12 @@
 package endpoint
 
 import (
-	"backnode/address"
-	"backnode/subscriptions"
-	"backnode/tools/log"
-	"backnode/types"
-	"backnode/watchdog"
 	"errors"
+	"module github.com/ITProLabDev/ethbacknode/address"
+	"module github.com/ITProLabDev/ethbacknode/subscriptions"
+	"module github.com/ITProLabDev/ethbacknode/tools/log"
+	"module github.com/ITProLabDev/ethbacknode/types"
+	"module github.com/ITProLabDev/ethbacknode/watchdog"
 
 	"github.com/valyala/fasthttp"
 )

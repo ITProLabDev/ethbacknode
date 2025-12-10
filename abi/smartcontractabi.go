@@ -1,11 +1,11 @@
 package abi
 
 import (
-	"backnode/common/hexnum"
-	"backnode/crypto"
-	"backnode/tools/log"
 	"fmt"
 	"math/big"
+	"module github.com/ITProLabDev/ethbacknode/common/hexnum"
+	"module github.com/ITProLabDev/ethbacknode/crypto"
+	"module github.com/ITProLabDev/ethbacknode/tools/log"
 	"strings"
 )
 

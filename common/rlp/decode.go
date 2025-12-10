@@ -17,7 +17,6 @@
 package rlp
 
 import (
-	"backnode/common/rlp/internal/rlpstruct"
 	"bufio"
 	"bytes"
 	"encoding/binary"
@@ -25,6 +24,7 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"module github.com/ITProLabDev/ethbacknode/common/rlp/internal/rlpstruct"
 	"reflect"
 	"strings"
 	"sync"

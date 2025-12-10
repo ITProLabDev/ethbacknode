@@ -1,10 +1,10 @@
 package abi
 
 import (
-	"backnode/address"
-	"backnode/storage"
-	"backnode/tools/log"
 	"encoding/json"
+	"module github.com/ITProLabDev/ethbacknode/address"
+	"module github.com/ITProLabDev/ethbacknode/storage"
+	"module github.com/ITProLabDev/ethbacknode/tools/log"
 	"strings"
 	"sync"
 )

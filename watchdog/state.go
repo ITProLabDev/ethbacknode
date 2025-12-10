@@ -1,8 +1,8 @@
 package watchdog
 
 import (
-	"backnode/storage"
 	"encoding/json"
+	"module github.com/ITProLabDev/ethbacknode/storage"
 	"time"
 )
 

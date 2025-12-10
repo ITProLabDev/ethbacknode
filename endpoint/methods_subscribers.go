@@ -1,8 +1,8 @@
 package endpoint
 
 import (
-	"backnode/subscriptions"
-	"backnode/tools/log"
+	"module github.com/ITProLabDev/ethbacknode/subscriptions"
+	"module github.com/ITProLabDev/ethbacknode/tools/log"
 )
 
 func (r *BackRpc) rpcProcessServiceRegister(ctx RequestContext, request RpcRequest, response RpcResponse) {

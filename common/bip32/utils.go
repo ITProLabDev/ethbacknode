@@ -1,14 +1,14 @@
 package bip32
 
 import (
-	"backnode/common/base58"
-	"backnode/crypto/secp256k1"
 	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
 	"io"
 	"math/big"
+	"module github.com/ITProLabDev/ethbacknode/common/base58"
+	"module github.com/ITProLabDev/ethbacknode/crypto/secp256k1"
 
 	"golang.org/x/crypto/ripemd160"
 )

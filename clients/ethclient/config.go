@@ -1,10 +1,10 @@
 package ethclient
 
 import (
-	"backnode/storage"
-	"backnode/tools/log"
-	"backnode/types"
 	"encoding/json"
+	"module github.com/ITProLabDev/ethbacknode/storage"
+	"module github.com/ITProLabDev/ethbacknode/tools/log"
+	"module github.com/ITProLabDev/ethbacknode/types"
 )
 
 type Config struct {

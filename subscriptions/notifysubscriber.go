@@ -1,6 +1,6 @@
 package subscriptions
 
-import "backnode/tools/log"
+import "module github.com/ITProLabDev/ethbacknode/tools/log"
 
 func (s *Manager) NotifySubscriber(serviceId ServiceId, subject string, data Signer) {
 	s.subscribersMux.RLock()

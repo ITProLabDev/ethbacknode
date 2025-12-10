@@ -27,7 +27,7 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-const pathOfPackageRLP = "backnode/common/rlp"
+const pathOfPackageRLP = "module github.com/ITProLabDev/ethbacknode/common/rlp"
 
 func main() {
 	var (

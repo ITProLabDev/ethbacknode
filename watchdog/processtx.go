@@ -1,8 +1,8 @@
 package watchdog
 
 import (
-	"backnode/tools/log"
-	"backnode/types"
+	"module github.com/ITProLabDev/ethbacknode/tools/log"
+	"module github.com/ITProLabDev/ethbacknode/types"
 )
 
 func (w *Service) processTx(tx *types.TransferInfo) error {

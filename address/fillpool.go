@@ -1,6 +1,6 @@
 package address
 
-import "backnode/tools/log"
+import "module github.com/ITProLabDev/ethbacknode/tools/log"
 
 func (p *Manager) checkFreeAddressPool() {
 	var totalAddresses, freeAddresses int

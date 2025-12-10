@@ -1,7 +1,7 @@
 package watchdog
 
 import (
-	"backnode/tools/log"
+	"module github.com/ITProLabDev/ethbacknode/tools/log"
 	"time"
 )
 

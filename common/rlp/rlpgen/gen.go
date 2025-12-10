@@ -17,11 +17,11 @@
 package main
 
 import (
-	"backnode/common/rlp/internal/rlpstruct"
 	"bytes"
 	"fmt"
 	"go/format"
 	"go/types"
+	"module github.com/ITProLabDev/ethbacknode/common/rlp/internal/rlpstruct"
 	"sort"
 )
 

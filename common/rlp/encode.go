@@ -17,11 +17,11 @@
 package rlp
 
 import (
-	"backnode/common/rlp/internal/rlpstruct"
 	"errors"
 	"fmt"
 	"io"
 	"math/big"
+	"module github.com/ITProLabDev/ethbacknode/common/rlp/internal/rlpstruct"
 	"reflect"
 
 	"github.com/holiman/uint256"

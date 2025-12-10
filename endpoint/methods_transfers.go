@@ -1,11 +1,11 @@
 package endpoint
 
 import (
-	"backnode/common/hexnum"
-	"backnode/tools/log"
-	"backnode/types"
 	"encoding/json"
 	"math/big"
+	"module github.com/ITProLabDev/ethbacknode/common/hexnum"
+	"module github.com/ITProLabDev/ethbacknode/tools/log"
+	"module github.com/ITProLabDev/ethbacknode/types"
 	"strings"
 )
 

@@ -1,14 +1,14 @@
 package ethclient
 
 import (
-	"backnode/abi"
-	"backnode/address"
-	"backnode/clients/urpc"
-	"backnode/common/hexnum"
-	"backnode/tools/log"
-	"backnode/types"
 	"errors"
 	"math/big"
+	"module github.com/ITProLabDev/ethbacknode/abi"
+	"module github.com/ITProLabDev/ethbacknode/address"
+	"module github.com/ITProLabDev/ethbacknode/clients/urpc"
+	"module github.com/ITProLabDev/ethbacknode/common/hexnum"
+	"module github.com/ITProLabDev/ethbacknode/tools/log"
+	"module github.com/ITProLabDev/ethbacknode/types"
 	"strings"
 )
 

@@ -1,9 +1,9 @@
 package txcache
 
 import (
-	"backnode/storage"
-	"backnode/tools/log"
 	"encoding/json"
+	"module github.com/ITProLabDev/ethbacknode/storage"
+	"module github.com/ITProLabDev/ethbacknode/tools/log"
 )
 
 func NewConfig() *Config {

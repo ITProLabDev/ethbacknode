@@ -1,9 +1,9 @@
 package subscriptions
 
 import (
-	"backnode/clients/urpc"
-	"backnode/tools/log"
 	"encoding/json"
+	"module github.com/ITProLabDev/ethbacknode/clients/urpc"
+	"module github.com/ITProLabDev/ethbacknode/tools/log"
 )
 
 type ServiceId int

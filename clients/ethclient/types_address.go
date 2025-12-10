@@ -1,7 +1,7 @@
 package ethclient
 
 import (
-	"backnode/crypto"
+	"module github.com/ITProLabDev/ethbacknode/crypto"
 	"regexp"
 	"strings"
 )

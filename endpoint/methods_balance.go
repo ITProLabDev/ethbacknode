@@ -1,9 +1,9 @@
 package endpoint
 
 import (
-	"backnode/tools/log"
-	"backnode/types"
 	"math/big"
+	"module github.com/ITProLabDev/ethbacknode/tools/log"
+	"module github.com/ITProLabDev/ethbacknode/types"
 	"strings"
 )
 

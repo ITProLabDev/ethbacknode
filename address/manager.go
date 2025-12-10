@@ -1,8 +1,8 @@
 package address
 
 import (
-	"backnode/storage"
-	"backnode/tools/log"
+	"module github.com/ITProLabDev/ethbacknode/storage"
+	"module github.com/ITProLabDev/ethbacknode/tools/log"
 	"sync"
 )
 

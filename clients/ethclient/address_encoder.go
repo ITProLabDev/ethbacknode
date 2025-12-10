@@ -1,9 +1,9 @@
 package ethclient
 
 import (
-	"backnode/address"
-	"backnode/common/hexnum"
-	"backnode/crypto"
+	"module github.com/ITProLabDev/ethbacknode/address"
+	"module github.com/ITProLabDev/ethbacknode/common/hexnum"
+	"module github.com/ITProLabDev/ethbacknode/crypto"
 	"strings"
 )
 

@@ -1,13 +1,13 @@
 package address
 
 import (
-	"backnode/common/bip32"
-	"backnode/common/bip39"
-	"backnode/common/bip44"
-	"backnode/common/hexnum"
-	"backnode/crypto"
-	"backnode/tools/log"
 	"fmt"
+	"module github.com/ITProLabDev/ethbacknode/common/bip32"
+	"module github.com/ITProLabDev/ethbacknode/common/bip39"
+	"module github.com/ITProLabDev/ethbacknode/common/bip44"
+	"module github.com/ITProLabDev/ethbacknode/common/hexnum"
+	"module github.com/ITProLabDev/ethbacknode/crypto"
+	"module github.com/ITProLabDev/ethbacknode/tools/log"
 	"strings"
 	"testing"
 )

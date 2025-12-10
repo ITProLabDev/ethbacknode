@@ -1,7 +1,7 @@
 package bip44_test
 
 import (
-	. "backnode/common/bip44"
+	. "module github.com/ITProLabDev/ethbacknode/common/bip44"
 	"testing"
 )
 

@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"backnode/tools/log"
+	"module github.com/ITProLabDev/ethbacknode/tools/log"
 	"os"
 	"path"
 	"path/filepath"
