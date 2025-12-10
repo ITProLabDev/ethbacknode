@@ -1,0 +1,59 @@
+package watchdog
+
+import (
+	"backnode/storage"
+	"backnode/tools/log"
+	"encoding/json"
+)
+
+type Config struct {
+	storage             storage.BinStorage
+	Run                 bool  `json:"run"`
+	PullInterval        int   `json:"pullInterval"`
+	PullByExternalEvent bool  `json:"pullByExternalEvent"`
+	PullByTimer         bool  `json:"pullByTimer"`
+	Confirmations       int64 `json:"confirmations"`
+	Debug               bool  `json:"debug"`
+}
+
+func _configDefaultStorage() storage.BinStorage {
+	configStore, err := storage.NewBinFileStorage("Config", "data", "watchdog", "config.json")
+	if err != nil {
+		log.Error("Can not get default config storage:", err)
+	}
+	return configStore
+}
+
+func (c *Config) Load() (err error) {
+	if !c.storage.IsExists() {
+		err = c.coldStart()
+		if err != nil {
+			return err
+		}
+	}
+	jsonBytes, err := c.storage.Load()
+	if err != nil {
+		return
+	}
+	err = json.Unmarshal(jsonBytes, c)
+	return
+}
+
+func (c *Config) Save() (err error) {
+	data, err := json.MarshalIndent(c, "", " ")
+	if err != nil {
+		return
+	}
+	err = c.storage.Save(data)
+	return
+}
+
+func (c *Config) coldStart() (err error) {
+	if c.storage == nil {
+		return ErrConfigStorageEmpty
+	}
+	c.Run = true
+	c.PullInterval = 5
+	c.Confirmations = 7
+	return c.Save()
+}

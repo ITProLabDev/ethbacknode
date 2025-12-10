@@ -1,0 +1,16 @@
+{
+ "nodeUrl": "localhost",
+ "nodePort": "8545",
+ "nodeUseSSL": false,
+ "nodeUseIPC": true,
+ "nodeIPCSocket": "/var/tmp/geth.ipc",
+ "rpcAddress": "localhost",
+ "rpcPort": "21280",
+ "dataPath": "data",
+ "debug_mode": true,
+ "flags": null,
+ "paramsString": null,
+ "paramsInt": {
+  "confirmations": 2
+ }
+}
