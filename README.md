@@ -1,7 +1,8 @@
 # EthBackNode
 
-![ethbacknode](assets/logo.svg)
-
+<p align="center">
+  <img src="assets/logo.png" alt="ethbacknode logo" width="320">
+</p>
 ![Go](https://img.shields.io/badge/Go-1.20%2B-00ADD8?logo=go&logoColor=white)
 ![License](https://img.shields.io/badge/License-GPLv3-blue)
 ![JSON-RPC](https://img.shields.io/badge/API-JSON--RPC%202.0-blue)
