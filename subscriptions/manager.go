@@ -1,9 +1,9 @@
 package subscriptions
 
 import (
-	"module github.com/ITProLabDev/ethbacknode/address"
-	"module github.com/ITProLabDev/ethbacknode/storage"
-	"module github.com/ITProLabDev/ethbacknode/types"
+	"github.com/ITProLabDev/ethbacknode/address"
+	"github.com/ITProLabDev/ethbacknode/storage"
+	"github.com/ITProLabDev/ethbacknode/types"
 	"sync"
 )
 

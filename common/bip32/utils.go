@@ -5,10 +5,10 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
+	"github.com/ITProLabDev/ethbacknode/common/base58"
+	"github.com/ITProLabDev/ethbacknode/crypto/secp256k1"
 	"io"
 	"math/big"
-	"module github.com/ITProLabDev/ethbacknode/common/base58"
-	"module github.com/ITProLabDev/ethbacknode/crypto/secp256k1"
 
 	"golang.org/x/crypto/ripemd160"
 )

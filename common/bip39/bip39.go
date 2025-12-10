@@ -11,8 +11,8 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/ITProLabDev/ethbacknode/common/bip39/wordlists"
 	"math/big"
-	"module github.com/ITProLabDev/ethbacknode/common/bip39/wordlists"
 	"strings"
 
 	"golang.org/x/crypto/pbkdf2"

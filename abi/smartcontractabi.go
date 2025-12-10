@@ -2,10 +2,10 @@ package abi
 
 import (
 	"fmt"
+	"github.com/ITProLabDev/ethbacknode/common/hexnum"
+	"github.com/ITProLabDev/ethbacknode/crypto"
+	"github.com/ITProLabDev/ethbacknode/tools/log"
 	"math/big"
-	"module github.com/ITProLabDev/ethbacknode/common/hexnum"
-	"module github.com/ITProLabDev/ethbacknode/crypto"
-	"module github.com/ITProLabDev/ethbacknode/tools/log"
 	"strings"
 )
 

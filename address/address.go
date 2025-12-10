@@ -5,8 +5,8 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"encoding/gob"
-	"module github.com/ITProLabDev/ethbacknode/crypto"
-	"module github.com/ITProLabDev/ethbacknode/crypto/secp256k1"
+	"github.com/ITProLabDev/ethbacknode/crypto"
+	"github.com/ITProLabDev/ethbacknode/crypto/secp256k1"
 )
 
 type Address struct {

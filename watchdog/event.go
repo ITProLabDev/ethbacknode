@@ -1,6 +1,6 @@
 package watchdog
 
-import "module github.com/ITProLabDev/ethbacknode/types"
+import "github.com/ITProLabDev/ethbacknode/types"
 
 type BlockEvent func(blockNum int64, blockId string)
 type TransactionEvent func(transactionInfo *types.TransferInfo)

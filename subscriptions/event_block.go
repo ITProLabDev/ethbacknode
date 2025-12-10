@@ -1,6 +1,6 @@
 package subscriptions
 
-import "module github.com/ITProLabDev/ethbacknode/tools/log"
+import "github.com/ITProLabDev/ethbacknode/tools/log"
 
 func (s *Manager) BlockEvent(blockNum int64, blockId string) {
 	s.eventPipe <- func() {

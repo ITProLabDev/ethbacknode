@@ -2,9 +2,9 @@ package subscriptions
 
 import (
 	"errors"
+	"github.com/ITProLabDev/ethbacknode/types"
 	"github.com/timshannon/badgerhold"
 	"math/big"
-	"module github.com/ITProLabDev/ethbacknode/types"
 )
 
 func (s *Manager) getTransactionById(txId string) (tx *TransferInfoRecord, err error) {

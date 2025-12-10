@@ -3,24 +3,25 @@ package main
 import (
 	"flag"
 	"fmt"
-	"module github.com/ITProLabDev/ethbacknode/abi"
-	"module github.com/ITProLabDev/ethbacknode/address"
-	"module github.com/ITProLabDev/ethbacknode/clients/ethclient"
-	"module github.com/ITProLabDev/ethbacknode/endpoint"
-	"module github.com/ITProLabDev/ethbacknode/storage"
-	"module github.com/ITProLabDev/ethbacknode/subscriptions"
-	"module github.com/ITProLabDev/ethbacknode/tools/log"
-	"module github.com/ITProLabDev/ethbacknode/txcache"
-	"module github.com/ITProLabDev/ethbacknode/watchdog"
 	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/ITProLabDev/ethbacknode/abi"
+	"github.com/ITProLabDev/ethbacknode/address"
+	"github.com/ITProLabDev/ethbacknode/clients/ethclient"
+	"github.com/ITProLabDev/ethbacknode/endpoint"
+	"github.com/ITProLabDev/ethbacknode/storage"
+	"github.com/ITProLabDev/ethbacknode/subscriptions"
+	"github.com/ITProLabDev/ethbacknode/tools/log"
+	"github.com/ITProLabDev/ethbacknode/txcache"
+	"github.com/ITProLabDev/ethbacknode/watchdog"
 )
 
 const (
-	APP_VERSION = "0.1.3b"
+	APP_VERSION = "0.1.3dev"
 	CHAIN_NAME  = "EVM"
 	APP_NAME    = "EthBackNode"
 )
@@ -206,6 +207,7 @@ func run() {
 		select {
 		case _ = <-done:
 			log.Info("Quit application by OS Signal by done...")
+			return
 		case _ = <-osSig:
 			log.Warning("Quit application by OS Signal...")
 			return

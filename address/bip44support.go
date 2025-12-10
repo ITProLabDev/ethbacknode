@@ -1,9 +1,9 @@
 package address
 
 import (
-	"module github.com/ITProLabDev/ethbacknode/common/bip32"
-	"module github.com/ITProLabDev/ethbacknode/common/bip39"
-	"module github.com/ITProLabDev/ethbacknode/common/bip44"
+	"github.com/ITProLabDev/ethbacknode/common/bip32"
+	"github.com/ITProLabDev/ethbacknode/common/bip39"
+	"github.com/ITProLabDev/ethbacknode/common/bip44"
 	"strings"
 )
 

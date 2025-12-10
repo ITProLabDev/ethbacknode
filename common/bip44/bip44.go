@@ -5,8 +5,8 @@
 package bip44
 
 import (
-	"module github.com/ITProLabDev/ethbacknode/common/bip32"
-	"module github.com/ITProLabDev/ethbacknode/common/bip39"
+	"github.com/ITProLabDev/ethbacknode/common/bip32"
+	"github.com/ITProLabDev/ethbacknode/common/bip39"
 )
 
 const Purpose uint32 = 0x8000002C

@@ -19,9 +19,9 @@ package rlp
 import (
 	"errors"
 	"fmt"
+	"github.com/ITProLabDev/ethbacknode/common/rlp/internal/rlpstruct"
 	"io"
 	"math/big"
-	"module github.com/ITProLabDev/ethbacknode/common/rlp/internal/rlpstruct"
 	"reflect"
 
 	"github.com/holiman/uint256"

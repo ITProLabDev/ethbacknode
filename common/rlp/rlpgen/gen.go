@@ -19,9 +19,9 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"github.com/ITProLabDev/ethbacknode/common/rlp/internal/rlpstruct"
 	"go/format"
 	"go/types"
-	"module github.com/ITProLabDev/ethbacknode/common/rlp/internal/rlpstruct"
 	"sort"
 )
 

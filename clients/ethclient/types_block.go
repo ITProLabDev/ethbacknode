@@ -2,8 +2,8 @@ package ethclient
 
 import (
 	"encoding/json"
+	"github.com/ITProLabDev/ethbacknode/common/hexnum"
 	"math/big"
-	"module github.com/ITProLabDev/ethbacknode/common/hexnum"
 )
 
 type Block struct {

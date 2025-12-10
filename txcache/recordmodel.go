@@ -1,8 +1,8 @@
 package txcache
 
 import (
+	"github.com/ITProLabDev/ethbacknode/types"
 	"math/big"
-	"module github.com/ITProLabDev/ethbacknode/types"
 )
 
 type TransferInfoCachedRecord struct {

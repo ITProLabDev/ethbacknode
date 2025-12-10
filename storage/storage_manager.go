@@ -1,9 +1,9 @@
 package storage
 
 import (
+	"github.com/ITProLabDev/ethbacknode/tools"
+	"github.com/ITProLabDev/ethbacknode/tools/log"
 	"github.com/timshannon/badgerhold"
-	"module github.com/ITProLabDev/ethbacknode/tools"
-	"module github.com/ITProLabDev/ethbacknode/tools/log"
 	"os"
 	"path"
 	"sync"

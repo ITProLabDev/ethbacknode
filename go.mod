@@ -1,9 +1,10 @@
-module ethbacknode
+module github.com/ITProLabDev/ethbacknode
 
 go 1.22.5
 
 require (
 	github.com/DeepForestTeam/go-logging v0.0.0-20160708070724-8f08274c3b08
+	github.com/dgraph-io/badger v1.6.2
 	github.com/holiman/uint256 v1.3.1
 	github.com/stretchr/testify v1.9.0
 	github.com/timshannon/badgerhold v1.0.0
@@ -19,7 +20,6 @@ require (
 	github.com/andybalholm/brotli v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/dgraph-io/badger v1.6.2 // indirect
 	github.com/dgraph-io/ristretto v0.2.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect

@@ -2,11 +2,11 @@ package endpoint
 
 import (
 	"errors"
-	"module github.com/ITProLabDev/ethbacknode/address"
-	"module github.com/ITProLabDev/ethbacknode/subscriptions"
-	"module github.com/ITProLabDev/ethbacknode/tools/log"
-	"module github.com/ITProLabDev/ethbacknode/types"
-	"module github.com/ITProLabDev/ethbacknode/watchdog"
+	"github.com/ITProLabDev/ethbacknode/address"
+	"github.com/ITProLabDev/ethbacknode/subscriptions"
+	"github.com/ITProLabDev/ethbacknode/tools/log"
+	"github.com/ITProLabDev/ethbacknode/types"
+	"github.com/ITProLabDev/ethbacknode/watchdog"
 
 	"github.com/valyala/fasthttp"
 )

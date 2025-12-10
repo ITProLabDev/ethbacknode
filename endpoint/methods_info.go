@@ -1,7 +1,7 @@
 package endpoint
 
 import (
-	"module github.com/ITProLabDev/ethbacknode/types"
+	"github.com/ITProLabDev/ethbacknode/types"
 	"time"
 )
 

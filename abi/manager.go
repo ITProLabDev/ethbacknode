@@ -2,9 +2,9 @@ package abi
 
 import (
 	"encoding/json"
-	"module github.com/ITProLabDev/ethbacknode/address"
-	"module github.com/ITProLabDev/ethbacknode/storage"
-	"module github.com/ITProLabDev/ethbacknode/tools/log"
+	"github.com/ITProLabDev/ethbacknode/address"
+	"github.com/ITProLabDev/ethbacknode/storage"
+	"github.com/ITProLabDev/ethbacknode/tools/log"
 	"strings"
 	"sync"
 )

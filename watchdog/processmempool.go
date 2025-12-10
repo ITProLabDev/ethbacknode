@@ -1,8 +1,8 @@
 package watchdog
 
 import (
-	"module github.com/ITProLabDev/ethbacknode/tools/log"
-	"module github.com/ITProLabDev/ethbacknode/types"
+	"github.com/ITProLabDev/ethbacknode/tools/log"
+	"github.com/ITProLabDev/ethbacknode/types"
 )
 
 func (w *Service) processMemPool(pool []*types.TransferInfo) {

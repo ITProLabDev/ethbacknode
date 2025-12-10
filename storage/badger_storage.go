@@ -1,8 +1,8 @@
 package storage
 
 import (
+	"github.com/ITProLabDev/ethbacknode/tools/log"
 	"github.com/dgraph-io/badger"
-	"module github.com/ITProLabDev/ethbacknode/tools/log"
 	"os"
 	"path"
 	"path/filepath"

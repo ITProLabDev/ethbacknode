@@ -1,7 +1,7 @@
 package uniclient
 
 import (
-	"module github.com/ITProLabDev/ethbacknode/tools/log"
+	"github.com/ITProLabDev/ethbacknode/tools/log"
 	"net/http"
 )
 

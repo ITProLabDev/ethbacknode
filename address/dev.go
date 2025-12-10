@@ -2,7 +2,7 @@ package address
 
 import (
 	"fmt"
-	"module github.com/ITProLabDev/ethbacknode/tools/log"
+	"github.com/ITProLabDev/ethbacknode/tools/log"
 )
 
 func (p *Manager) DevCheckMemPool() {

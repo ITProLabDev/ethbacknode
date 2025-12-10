@@ -2,8 +2,8 @@ package address
 
 import (
 	"encoding/json"
-	"module github.com/ITProLabDev/ethbacknode/storage"
-	"module github.com/ITProLabDev/ethbacknode/tools/log"
+	"github.com/ITProLabDev/ethbacknode/storage"
+	"github.com/ITProLabDev/ethbacknode/tools/log"
 )
 
 type Config struct {

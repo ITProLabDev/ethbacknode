@@ -4,9 +4,9 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"github.com/ITProLabDev/ethbacknode/common/hexnum"
+	"github.com/ITProLabDev/ethbacknode/crypto/secp256k1"
 	"math/big"
-	"module github.com/ITProLabDev/ethbacknode/common/hexnum"
-	"module github.com/ITProLabDev/ethbacknode/crypto/secp256k1"
 )
 
 func PubKeyToAddressBytes(p ecdsa.PublicKey) []byte {

@@ -3,8 +3,8 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"module github.com/ITProLabDev/ethbacknode/storage"
-	"module github.com/ITProLabDev/ethbacknode/tools/log"
+	"github.com/ITProLabDev/ethbacknode/storage"
+	"github.com/ITProLabDev/ethbacknode/tools/log"
 )
 
 var (

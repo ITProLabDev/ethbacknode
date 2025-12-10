@@ -1,7 +1,7 @@
 package txcache
 
 import (
-	"module github.com/ITProLabDev/ethbacknode/storage"
+	"github.com/ITProLabDev/ethbacknode/storage"
 	"sync"
 )
 

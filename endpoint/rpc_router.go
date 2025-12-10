@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"github.com/ITProLabDev/ethbacknode/tools/log"
 	"github.com/valyala/fasthttp"
-	"module github.com/ITProLabDev/ethbacknode/tools/log"
 	"runtime/debug"
 	"strings"
 )

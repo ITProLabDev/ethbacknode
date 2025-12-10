@@ -2,8 +2,8 @@ package subscriptions
 
 import (
 	"errors"
-	"module github.com/ITProLabDev/ethbacknode/tools/log"
-	"module github.com/ITProLabDev/ethbacknode/types"
+	"github.com/ITProLabDev/ethbacknode/tools/log"
+	"github.com/ITProLabDev/ethbacknode/types"
 )
 
 func (s *Manager) TransactionEvent(transactionInfo *types.TransferInfo) {
