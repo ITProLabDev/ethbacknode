@@ -98,12 +98,29 @@ The recommended way to run **ethbacknode** is by connecting to a local Ethereum 
 
 When running ethbacknode inside Docker, IPC connectivity can be achieved by mounting the Ethereum data directory from the host or from a shared Docker volume:
 
-```bash
-docker run \
-  -v ~/.ethereum:/ethereum \
-  -e ETH_NODE_IPC=/ethereum/geth.ipc \
-  ethbacknode
+## Architecture Notes
 
+`ethbacknode` is designed to run **on the same host as the Ethereum node (geth)** and communicate with it via **IPC (`geth.ipc`)**.
+
+This approach is considered a best practice for the following reasons:
+
+- IPC provides lower latency and higher reliability compared to HTTP/WebSocket.
+- No need to expose Ethereum node RPC endpoints over the network.
+- Reduced attack surface and simpler security model.
+- Direct filesystem-level access to the IPC socket.
+
+Because of this design choice, containerization via Docker is **not a primary goal** at the moment.
+
+## Docker Status
+
+At this stage, Docker support is intentionally postponed.
+
+Key reasons:
+- `ethbacknode` relies on direct access to `geth.ipc`, which is typically available only on the host filesystem.
+- Mapping IPC sockets into containers introduces platform-specific complexity and reduces reliability.
+- The service also performs **outgoing HTTP callbacks** to client backends (event notifications), which requires careful network and security design in containerized environments.
+
+Docker support may be revisited in the future if a clear, secure, and maintainable deployment model is defined.
 
 ## API Interface
 
@@ -135,25 +152,14 @@ Configuration examples will be added as the project evolves.
 - Mnemonic phrases and private keys must be handled securely
 - Signing endpoints should never be publicly exposed
 
-## TODO
+## TODO / Roadmap
 
-- **Configuration via environment variables**
-    - Define all runtime options (RPC endpoint, log level, DB/queue endpoints, service IDs, etc.) via `ETHBACKNODE_*` env vars.
-    - Provide a `.env.example` with sane defaults and short comments.
-    - Document precedence rules (env vars vs config file / flags).
-
-- **Token-based authentication**
-    - Add optional API token verification for JSON-RPC requests.
-    - Support passing tokens via HTTP header (e.g. `Authorization: Bearer <token>`) and/or query params.
-    - Implement token revocation / rotation strategy and basic rate limiting hooks.
-
-- **Continuous Integration (CI)**
-    - Set up GitHub Actions workflow:
-        - `go test ./...` on push / PR.
-        - `golangci-lint` (or similar) for static analysis.
-        - Build and publish tagged Docker images to a registry.
-    - Add status badges (build, tests, lint) to `README.md`.
-- **Switch logging library** – Replace the current logging implementation with a new structured logging module (e.g., `zerolog`, `zap`, `logrus`) to improve performance, structured output support, and better integration with observability tools.
+- [ ] Configuration via environment variables
+- [ ] Token-based API authorization
+- [ ] CI pipeline (linting, tests, builds)
+- [ ] Logging subsystem refactoring (switch to structured logging)
+- [ ] Re-evaluate Docker support with IPC-safe deployment model
+- [ ] Review security model for outbound HTTP callbacks (event delivery)
 
 # ethbacknode JSON-RPC 2.0 API
 
