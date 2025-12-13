@@ -3,6 +3,7 @@ package endpoint
 type Router interface {
 	Handle(method string, processor Processor)
 }
+
 type Processor interface {
 	Process(ctx RequestContext, request RpcRequest, result RpcResponse) (err error)
 }

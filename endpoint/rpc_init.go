@@ -1,42 +1,44 @@
 package endpoint
 
 func (r *BackRpc) InitProcessors() {
-	r.rpcProcessors["ping"] = r.rpcProcessPing
-	r.rpcProcessors["info"] = r.rpcProcessNodeInfo
-	r.rpcProcessors["getNodeInfo"] = r.rpcProcessNodeInfo
+	r.RegisterProcessor("ping", r.rpcProcessPing)
+	r.RegisterProcessor("info", r.rpcProcessNodeInfo)
+	r.RegisterProcessor("getNodeInfo", r.rpcProcessNodeInfo)
 
-	r.rpcProcessors["infoGetTokenList"] = r.rpcProcessInfoGetTokenList
-	r.rpcProcessors["info.get.token.list"] = r.rpcProcessInfoGetTokenList
+	r.RegisterProcessor("infoGetTokenList", r.rpcProcessInfoGetTokenList)
+	r.RegisterProcessor("info.get.token.list", r.rpcProcessInfoGetTokenList)
 
-	r.rpcProcessors["address.balance"] = r.rpcProcessGetBalance
-	r.rpcProcessors["addressGetBalance"] = r.rpcProcessGetBalance
+	r.RegisterProcessor("address.balance", r.rpcProcessGetBalance)
+	r.RegisterProcessor("addressGetBalance", r.rpcProcessGetBalance)
 
-	r.rpcProcessors["address.subscribe"] = r.rpcProcessAddressSubscribe
-	r.rpcProcessors["addressSubscribe"] = r.rpcProcessAddressSubscribe
+	r.RegisterProcessor("address.subscribe", r.rpcProcessAddressSubscribe)
+	r.RegisterProcessor("addressSubscribe", r.rpcProcessAddressSubscribe)
 
-	r.rpcProcessors["address.get.new"] = r.rpcProcessAddressGetNew
-	r.rpcProcessors["addressGetNew"] = r.rpcProcessAddressGetNew
+	r.RegisterSecuredProcessor("address.get.new", r.rpcProcessAddressGetNew)
+	r.RegisterSecuredProcessor("addressGetNew", r.rpcProcessAddressGetNew)
 
-	r.rpcProcessors["address.recover"] = r.rpcProcessAddressRecover
-	r.rpcProcessors["addressRecover"] = r.rpcProcessAddressRecover
+	r.RegisterProcessor("address.recover", r.rpcProcessAddressRecover)
+	r.RegisterProcessor("addressRecover", r.rpcProcessAddressRecover)
 
-	r.rpcProcessors["address.generate"] = r.rpcProcessAddressGenerate
-	r.rpcProcessors["addressGenerate"] = r.rpcProcessAddressGenerate
+	r.RegisterSecuredProcessor("address.generate", r.rpcProcessAddressGenerate)
+	r.RegisterSecuredProcessor("addressGenerate", r.rpcProcessAddressGenerate)
 
-	r.rpcProcessors["service.register"] = r.rpcProcessServiceRegister
-	r.rpcProcessors["serviceRegister"] = r.rpcProcessServiceRegister
-	r.rpcProcessors["service.config"] = r.rpcProcessServiceConfig
-	r.rpcProcessors["serviceConfig"] = r.rpcProcessServiceConfig
+	r.RegisterProcessor("service.register", r.rpcProcessServiceRegister)
+	r.RegisterProcessor("serviceRegister", r.rpcProcessServiceRegister)
 
-	r.rpcProcessors["transfer.info"] = r.rpcProcessGetTransferInfo
-	r.rpcProcessors["transferInfo"] = r.rpcProcessGetTransferInfo
-	r.rpcProcessors["transfer.info.for.address"] = r.rpcProcessGetTransfersForAddress
-	r.rpcProcessors["transferInfoForAddress"] = r.rpcProcessGetTransfersForAddress
+	r.RegisterSecuredProcessor("service.config", r.rpcProcessServiceConfig)
+	r.RegisterSecuredProcessor("serviceConfig", r.rpcProcessServiceConfig)
 
-	r.rpcProcessors["transfer.assets"] = r.rpcProcessTransferAssets
-	r.rpcProcessors["transferAssets"] = r.rpcProcessTransferAssets
+	r.RegisterProcessor("transfer.info", r.rpcProcessGetTransferInfo)
+	r.RegisterProcessor("transferInfo", r.rpcProcessGetTransferInfo)
 
-	r.rpcProcessors["transfer.get.estimated.fee"] = r.rpcProcessTransferGetEstimatedFee
-	r.rpcProcessors["transferGetEstimatedFee"] = r.rpcProcessTransferGetEstimatedFee
+	r.RegisterSecuredProcessor("transfer.info.for.address", r.rpcProcessGetTransfersForAddress)
+	r.RegisterSecuredProcessor("transferInfoForAddress", r.rpcProcessGetTransfersForAddress)
+
+	r.RegisterSecuredProcessor("transfer.assets", r.rpcProcessTransferAssets)
+	r.RegisterSecuredProcessor("transferAssets", r.rpcProcessTransferAssets)
+
+	r.RegisterSecuredProcessor("transfer.get.estimated.fee", r.rpcProcessTransferGetEstimatedFee)
+	r.RegisterSecuredProcessor("transferGetEstimatedFee", r.rpcProcessTransferGetEstimatedFee)
 
 }

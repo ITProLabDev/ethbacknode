@@ -3,6 +3,7 @@ package endpoint
 import (
 	"bytes"
 	"errors"
+
 	"github.com/ITProLabDev/ethbacknode/address"
 	"github.com/ITProLabDev/ethbacknode/common/hexnum"
 	"github.com/ITProLabDev/ethbacknode/subscriptions"
@@ -191,10 +192,6 @@ func (r *BackRpc) rpcProcessAddressGetNew(ctx RequestContext, request RpcRequest
 	}
 	response.SetResult(newAddressResponse)
 }
-
-//func (r *BackRpc) rpcProcessAddress(ctx RequestContext, request RpcRequest, response RpcResponse) {
-//
-//}
 
 func (r *BackRpc) rpcProcessAddressRecover(ctx RequestContext, request RpcRequest, response RpcResponse) {
 	type addressRecoverRequest struct {

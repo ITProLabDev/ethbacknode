@@ -1,8 +1,9 @@
 package endpoint
 
 import (
-	"github.com/valyala/fasthttp"
 	"net"
+
+	"github.com/valyala/fasthttp"
 )
 
 type ServerOption func(s *endpointServer) error

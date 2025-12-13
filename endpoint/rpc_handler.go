@@ -2,7 +2,9 @@ package endpoint
 
 import (
 	"errors"
+
 	"github.com/ITProLabDev/ethbacknode/address"
+	"github.com/ITProLabDev/ethbacknode/security"
 	"github.com/ITProLabDev/ethbacknode/subscriptions"
 	"github.com/ITProLabDev/ethbacknode/tools/log"
 	"github.com/ITProLabDev/ethbacknode/types"
@@ -22,6 +24,7 @@ type BackRpc struct {
 	chainClient      types.ChainClient
 	knownTokens      map[string]*types.TokenInfo
 	subscriptions    *subscriptions.Manager
+	security         *security.Manager
 	watchdog         *watchdog.Service
 	txCache          types.TxCache
 	fallbackResponse HttpResponse
@@ -50,14 +53,20 @@ func WithRpcProcessor(method RpcMethod, processor RpcProcessor) BackRpcOption {
 	}
 }
 
-func NewBackRpc(addressPool *address.Manager, chainClient types.ChainClient, subscriptions *subscriptions.Manager, watchdog *watchdog.Service, txcache types.TxCache, options ...BackRpcOption) *BackRpc {
+func WithSecurityManager(securityManager *security.Manager) BackRpcOption {
+	return func(r *BackRpc) {
+		r.security = securityManager
+	}
+}
+
+func NewBackRpc(addressPool *address.Manager, chainClient types.ChainClient, subscriptions *subscriptions.Manager, watchdog *watchdog.Service, txCache types.TxCache, options ...BackRpcOption) *BackRpc {
 	r := &BackRpc{
 		addressPool:   addressPool,
 		chainClient:   chainClient,
 		knownTokens:   make(map[string]*types.TokenInfo),
 		subscriptions: subscriptions,
 		watchdog:      watchdog,
-		txCache:       txcache,
+		txCache:       txCache,
 		addressCodec:  chainClient.GetAddressCodec(),
 		rpcProcessors: make(map[RpcMethod]RpcProcessor),
 	}
@@ -103,4 +112,21 @@ type HttpResponse interface {
 	ContentType() string
 	StatusCode() int
 	Body() string
+}
+
+func (r *BackRpc) RegisterProcessor(method RpcMethod, processor RpcProcessor) {
+	r.rpcProcessors[method] = processor
+}
+
+func (r *BackRpc) RegisterSecuredProcessor(method RpcMethod, processor RpcProcessor) {
+	r.rpcProcessors[method] = func(ctx RequestContext, request RpcRequest, response RpcResponse) {
+		//todo
+		serviceId, err := request.GetParamInt("serviceId")
+		if err != nil {
+			response.SetError(ERROR_CODE_INVALID_REQUEST, ERROR_MESSAGE_INVALID_REQUEST)
+			return
+		}
+		log.Warning("rpc processor auth for serviceId:", serviceId)
+		processor(ctx, request, response)
+	}
 }
