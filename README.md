@@ -92,6 +92,19 @@ Basic example of running the service:
 
 The service will start and expose a JSON-RPC 2.0 endpoint for client backend interaction.
 
+## Ethereum Node Connectivity
+
+The recommended way to run **ethbacknode** is by connecting to a local Ethereum node via **IPC (`geth.ipc`)**, as this provides the best performance, lowest latency, and improved security compared to HTTP-based RPC.
+
+When running ethbacknode inside Docker, IPC connectivity can be achieved by mounting the Ethereum data directory from the host or from a shared Docker volume:
+
+```bash
+docker run \
+  -v ~/.ethereum:/ethereum \
+  -e ETH_NODE_IPC=/ethereum/geth.ipc \
+  ethbacknode
+
+
 ## API Interface
 
 All client interactions with `ethbacknode` are performed via **JSON-RPC 2.0**.
