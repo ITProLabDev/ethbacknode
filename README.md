@@ -11,6 +11,13 @@
 
 **Backend microservice for interacting with Ethereum nodes, including transaction monitoring and transfers.**
 
+> **Note**
+>
+> This project is currently focused on the **Ethereum blockchain** and its ecosystem.
+>
+> If you require support for other blockchains such as **TRON**, **BSC (Binance Smart Chain)**, or additional networks, feel free to **contact the author** to discuss possible extensions, custom implementations, or contributions.
+
+
 ## Overview
 
 `ethbacknode` is a backend microservice written in **Golang** that acts as an intermediary layer between backend systems and Ethereum nodes.
@@ -133,7 +140,7 @@ Configuration examples will be added as the project evolves.
         - `golangci-lint` (or similar) for static analysis.
         - Build and publish tagged Docker images to a registry.
     - Add status badges (build, tests, lint) to `README.md`.
-
+- **Switch logging library** – Replace the current logging implementation with a new structured logging module (e.g., `zerolog`, `zap`, `logrus`) to improve performance, structured output support, and better integration with observability tools.
 
 # ethbacknode JSON-RPC 2.0 API
 
