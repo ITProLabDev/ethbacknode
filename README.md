@@ -250,6 +250,22 @@ This overview serves as an entry point for the detailed sections below.
 - **Content-Type:** `application/json`
 
 ---
+## System Architecture Overview
+
+The diagram below illustrates the **overall architecture of the crypto payment processing platform**, of which **ethbacknode** is a core infrastructural component.
+
+ethbacknode is responsible for interacting with the **Ethereum blockchain node (geth)**, receiving blockchain events (blocks, transactions), and forwarding them to the client backend via HTTP callbacks or RPC interfaces. It operates as part of a broader ecosystem that includes payment processing, address management, notification delivery, and administrative services.
+
+This diagram is provided to give **architectural context** and to help understand how ethbacknode fits into the larger system, including:
+- blockchain daemon integration,
+- abstraction layers and wrappers,
+- event subscription and delivery,
+- and interaction with higher-level payment and service modules.
+
+> **Note:** ethbacknode itself focuses strictly on blockchain interaction and event propagation. Other components shown in the diagram are out of scope of this repository and may belong to separate services or systems.
+
+![System Architecture Diagram](./assets/architecture.png)
+---
 
 ## Status
 
