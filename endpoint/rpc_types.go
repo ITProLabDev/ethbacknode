@@ -13,6 +13,8 @@ const (
 	ERROR_MESSAGE_METHOD_NOT_FOUND = "method not found"
 	ERROR_CODE_SERVER_ERROR        = -32000
 	ERROR_MESSAGE_SERVER_ERROR     = "server error"
+	ERROR_CODE_UNAUTHORIZED        = -32001
+	ERROR_MESSAGE_UNAUTHORIZED     = "unauthorized access"
 )
 
 type RequestId string

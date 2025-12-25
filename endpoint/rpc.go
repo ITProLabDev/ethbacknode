@@ -13,6 +13,10 @@ type RequestContext interface {
 	GetInt(key string) (value int64, err error)
 	GetBool(key string) (value bool, err error)
 	GetApiToken() (token string, err error)
+	SetBool(key string, value bool)
+	SetString(key string, value string)
+	SetInt(key string, value int64)
+	Authorized(bool)
 }
 
 type RpcRequest interface {
@@ -26,4 +30,5 @@ type RpcRequest interface {
 type RpcResponse interface {
 	SetResult(result interface{})
 	SetError(code int, message string)
+	SetErrorWithData(code int, message, data string)
 }

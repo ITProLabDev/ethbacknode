@@ -19,6 +19,7 @@ type JsonRpcResponse struct {
 type JsonRpcError struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
+	Data    string `json:"data"`
 }
 
 func (r *JsonRpcResponse) SetResultBytes(result []byte) {
@@ -37,4 +38,10 @@ func (r *JsonRpcResponse) SetError(code int, message string) {
 		r.Error = new(JsonRpcError)
 	}
 	r.Error.Code, r.Error.Message = code, message
+}
+func (r *JsonRpcResponse) SetErrorWithData(code int, message, data string) {
+	if r.Error == nil {
+		r.Error = new(JsonRpcError)
+	}
+	r.Error.Code, r.Error.Message, r.Error.Data = code, message, data
 }

@@ -4,6 +4,7 @@ import (
 	"net"
 	"strconv"
 
+	"github.com/ITProLabDev/ethbacknode/security"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -44,5 +45,29 @@ func WithSshListener(listenPort int, knownKeys []string) ServerOption {
 			},
 		}
 		return nil
+	}
+}
+
+func WithDebugMode(debugMode bool) BackRpcOption {
+	return func(r *BackRpc) {
+		r.debugMode = debugMode
+	}
+}
+
+func WithFallbackResponse(response HttpResponse) BackRpcOption {
+	return func(r *BackRpc) {
+		r.fallbackResponse = response
+	}
+}
+
+func WithRpcProcessor(method RpcMethod, processor RpcProcessor) BackRpcOption {
+	return func(r *BackRpc) {
+		r.AddRpcProcessor(method, processor)
+	}
+}
+
+func WithSecurityManager(securityManager *security.Manager) BackRpcOption {
+	return func(r *BackRpc) {
+		r.security = securityManager
 	}
 }

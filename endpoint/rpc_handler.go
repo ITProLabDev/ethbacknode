@@ -30,45 +30,23 @@ type BackRpc struct {
 	fallbackResponse HttpResponse
 	addressCodec     address.AddressCodec
 	rpcProcessors    map[RpcMethod]RpcProcessor
+	securityManager  *security.Manager
 	burnAddress      string
 }
 
 type BackRpcOption func(r *BackRpc)
 
-func WithDebugMode(debugMode bool) BackRpcOption {
-	return func(r *BackRpc) {
-		r.debugMode = debugMode
-	}
-}
-
-func WithFallbackResponse(response HttpResponse) BackRpcOption {
-	return func(r *BackRpc) {
-		r.fallbackResponse = response
-	}
-}
-
-func WithRpcProcessor(method RpcMethod, processor RpcProcessor) BackRpcOption {
-	return func(r *BackRpc) {
-		r.AddRpcProcessor(method, processor)
-	}
-}
-
-func WithSecurityManager(securityManager *security.Manager) BackRpcOption {
-	return func(r *BackRpc) {
-		r.security = securityManager
-	}
-}
-
 func NewBackRpc(addressPool *address.Manager, chainClient types.ChainClient, subscriptions *subscriptions.Manager, watchdog *watchdog.Service, txCache types.TxCache, options ...BackRpcOption) *BackRpc {
 	r := &BackRpc{
-		addressPool:   addressPool,
-		chainClient:   chainClient,
-		knownTokens:   make(map[string]*types.TokenInfo),
-		subscriptions: subscriptions,
-		watchdog:      watchdog,
-		txCache:       txCache,
-		addressCodec:  chainClient.GetAddressCodec(),
-		rpcProcessors: make(map[RpcMethod]RpcProcessor),
+		addressPool:     addressPool,
+		chainClient:     chainClient,
+		knownTokens:     make(map[string]*types.TokenInfo),
+		subscriptions:   subscriptions,
+		watchdog:        watchdog,
+		txCache:         txCache,
+		addressCodec:    chainClient.GetAddressCodec(),
+		rpcProcessors:   make(map[RpcMethod]RpcProcessor),
+		securityManager: security.NewManager(),
 	}
 	r.InitProcessors()
 	for _, option := range options {
@@ -83,11 +61,10 @@ func NewBackRpc(addressPool *address.Manager, chainClient types.ChainClient, sub
 
 func (r *BackRpc) Handle(ctx *fasthttp.RequestCtx) {
 	if r.debugMode {
-		log.Warning("Handle rpc request:", string(ctx.Method()), string(ctx.Path()))
+		log.Debug("Handle rpc request:", string(ctx.Method()), string(ctx.Path()))
 	}
-	//TODO check credentials
-	//TODO check rate limit
-	//TODO check request size
+	//TODO add rate limit
+	//TODO limit request size
 	err := r.RouteRpcRequest(ctx)
 	if errors.Is(err, errInternalRouteNotFound) {
 		if string(ctx.Method()) == fasthttp.MethodGet {
@@ -120,13 +97,41 @@ func (r *BackRpc) RegisterProcessor(method RpcMethod, processor RpcProcessor) {
 
 func (r *BackRpc) RegisterSecuredProcessor(method RpcMethod, processor RpcProcessor) {
 	r.rpcProcessors[method] = func(ctx RequestContext, request RpcRequest, response RpcResponse) {
-		//todo
 		serviceId, err := request.GetParamInt("serviceId")
 		if err != nil {
 			response.SetError(ERROR_CODE_INVALID_REQUEST, ERROR_MESSAGE_INVALID_REQUEST)
 			return
 		}
-		log.Warning("rpc processor auth for serviceId:", serviceId)
+		if r.debugMode {
+			log.Debug("rpc processor auth for serviceId:", serviceId)
+		}
+		subscriber, err := r.subscriptions.SubscriptionGet(subscriptions.ServiceId(serviceId))
+		if err != nil {
+			log.Error("Invalid serviceId:", serviceId, ", err:", err)
+			response.SetErrorWithData(ERROR_CODE_UNAUTHORIZED, ERROR_MESSAGE_UNAUTHORIZED, "serviceId required")
+			return
+		}
+		if subscriber.ApiToken != "" || subscriber.ApiKey != "" {
+			switch {
+			case subscriber.ApiToken != "":
+				requestApiToken, err := ctx.GetApiToken()
+				if err != nil {
+					response.SetErrorWithData(ERROR_CODE_UNAUTHORIZED, ERROR_MESSAGE_UNAUTHORIZED, "api token required")
+					return
+				}
+				if subscriber.ApiToken != requestApiToken {
+					response.SetErrorWithData(ERROR_CODE_UNAUTHORIZED, ERROR_MESSAGE_UNAUTHORIZED, "api token required")
+					return
+				}
+				ctx.Authorized(true)
+			case subscriber.ApiKey != "":
+				if r.securityManager == nil {
+					log.Critical("SecurityManager not initialized")
+					response.SetError(ERROR_CODE_SERVER_ERROR, ERROR_MESSAGE_SERVER_ERROR)
+					return
+				}
+			}
+		}
 		processor(ctx, request, response)
 	}
 }

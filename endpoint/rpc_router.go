@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"github.com/ITProLabDev/ethbacknode/tools/log"
-	"github.com/valyala/fasthttp"
 	"runtime/debug"
 	"strings"
+
+	"github.com/ITProLabDev/ethbacknode/tools/log"
+	"github.com/valyala/fasthttp"
 )
 
 func (r *BackRpc) AddRpcProcessor(method RpcMethod, processor RpcProcessor) {
@@ -27,7 +28,7 @@ func (r *BackRpc) RouteRpcRequest(ctx *fasthttp.RequestCtx) (err error) {
 	rpcRequestContext.stringParams["path"] = string(ctx.Path())
 	rpcRequestContext.stringParams["uri"] = string(ctx.URI().RequestURI())
 
-	token, err := r.parseApiToken(ctx)
+	token, err := r.peekApiToken(ctx)
 	if err == nil {
 		rpcRequestContext.apiToken = token
 	}
@@ -35,6 +36,7 @@ func (r *BackRpc) RouteRpcRequest(ctx *fasthttp.RequestCtx) (err error) {
 		log.Warning("Route rpc request:", string(ctx.Method()), string(ctx.Path()))
 	}
 	if strings.HasPrefix(string(ctx.Path()), "/api/v1/") {
+		//todo RESTful endpoint
 		log.Warning("Process try RESTful request")
 	} else if strings.HasPrefix(string(ctx.Path()), "/rpc") {
 		if string(ctx.Method()) != fasthttp.MethodPost {
@@ -42,6 +44,7 @@ func (r *BackRpc) RouteRpcRequest(ctx *fasthttp.RequestCtx) (err error) {
 		}
 		return r.processRpcRequest(ctx, rpcRequestContext)
 	} else if strings.HasPrefix(string(ctx.Path()), "/ws") {
+		//TODO websocket API
 		log.Warning("TODO Process try WS connection")
 	} else if strings.HasPrefix(string(ctx.Path()), "/docs") {
 		//TODO Show API docs
@@ -52,7 +55,7 @@ func (r *BackRpc) RouteRpcRequest(ctx *fasthttp.RequestCtx) (err error) {
 	return errInternalRouteNotFound
 }
 
-func (r *BackRpc) parseApiToken(ctx *fasthttp.RequestCtx) (token string, err error) {
+func (r *BackRpc) peekApiToken(ctx *fasthttp.RequestCtx) (token string, err error) {
 	token = string(ctx.Request.Header.Peek("X-Api-Token"))
 	if token == "" {
 		return "", errApiTokenNotProvided
@@ -75,7 +78,6 @@ func (r *BackRpc) processRpcRequest(ctx *fasthttp.RequestCtx, rpcRequestContext 
 		rpcResponse.SetError(ERROR_CODE_SERVER_ERROR, ERROR_MESSAGE_SERVER_ERROR)
 		_ = json.NewEncoder(ctx.Response.BodyWriter()).Encode(rpcResponse)
 	}()
-
 	body := ctx.Request.Body()
 	if r.debugMode {
 		log.Warning(string(body))

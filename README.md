@@ -97,10 +97,11 @@ This diagram is provided to give **architectural context** and to help understan
 ### Build from source
 
 Clone the repository and build the binary:
-
+```bash
 git clone https://github.com/ITProLabDev/ethbacknode.git  
 cd ethbacknode  
 go build -o ethbacknode
+```
 
 ### Run the service
 
@@ -173,7 +174,7 @@ Configuration examples will be added as the project evolves.
 ## TODO / Roadmap
 
 - [ ] Configuration via environment variables
-- [ ] Token-based API authorization
+- [x] Basic token-based API authorization
 - [ ] CI pipeline (linting, tests, builds)
 - [ ] Logging subsystem refactoring (switch to structured logging)
 - [ ] Re-evaluate Docker support with IPC-safe deployment model

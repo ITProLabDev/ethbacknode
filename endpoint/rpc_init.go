@@ -40,5 +40,4 @@ func (r *BackRpc) InitProcessors() {
 
 	r.RegisterSecuredProcessor("transfer.get.estimated.fee", r.rpcProcessTransferGetEstimatedFee)
 	r.RegisterSecuredProcessor("transferGetEstimatedFee", r.rpcProcessTransferGetEstimatedFee)
-
 }

@@ -2,6 +2,7 @@ package subscriptions
 
 import (
 	"encoding/json"
+
 	"github.com/ITProLabDev/ethbacknode/clients/urpc"
 	"github.com/ITProLabDev/ethbacknode/tools/log"
 )
@@ -79,21 +80,25 @@ func (s *Manager) SubscriptionEdit(serviceId ServiceId, edit func(subscription *
 }
 
 type Subscription struct {
-	rpc                 *urpc.Client
-	ServiceName         string          `json:"serviceName"`
-	ServiceId           ServiceId       `json:"serviceId"`
-	Internal            bool            `json:"internal,omitempty"`
-	ApiToken            string          `json:"apiToken"`
-	ApiKey              string          `json:"apiKey"`
-	EndpointUrl         string          `json:"eventUrl"`
-	ReportNewBlock      bool            `json:"reportNewBlock"`
-	ReportIncomingTx    bool            `json:"reportIncomingTx"`
-	ReportOutgoingTx    bool            `json:"reportOutgoingTx"`
-	ReportMainCoin      bool            `json:"reportMainCoin"`
-	ReportTokens        map[string]bool `json:"reportTokens"`
-	ReportBalanceChange bool            `json:"balanceChange"`
-	GatherToMaster      bool            `json:"gatherToMaster"`
-	MasterList          []string        `json:"masterList"`
+	rpc                  *urpc.Client
+	ServiceName          string          `json:"serviceName"`
+	ServiceId            ServiceId       `json:"serviceId"`
+	Internal             bool            `json:"internal,omitempty"`
+	ApiToken             string          `json:"apiToken"`
+	ApiKey               string          `json:"apiKey"`
+	EndpointUrl          string          `json:"eventUrl"`
+	ReportNewBlock       bool            `json:"reportNewBlock"`
+	ReportIncomingTx     bool            `json:"reportIncomingTx"`
+	ReportOutgoingTx     bool            `json:"reportOutgoingTx"`
+	ReportMainCoin       bool            `json:"reportMainCoin"`
+	ReportTokens         map[string]bool `json:"reportTokens"`
+	ReportBalanceChange  bool            `json:"balanceChange"`
+	GatherToMaster       bool            `json:"gatherToMaster"`
+	MasterList           []string        `json:"masterList"`
+	SecuritySignRequests bool            `json:"securitySignRequests,omitempty"`
+	SecuritySignResponse bool            `json:"securitySignResponse,omitempty"`
+	//Reserved for future use
+	SecurityUseEncryption bool `json:"securityUseEncryption,omitempty"`
 }
 
 func (s *Subscription) equal(with *Subscription) bool {
