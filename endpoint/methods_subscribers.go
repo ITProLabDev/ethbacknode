@@ -19,6 +19,7 @@ func (r *BackRpc) rpcProcessServiceConfig(ctx RequestContext, request RpcRequest
 		ReportTokens     []string                `json:"reportTokens"`
 		GatherToMaster   bool                    `json:"gatherToMaster"`
 		MasterList       []string                `json:"masterList"`
+		Signature        string                  `json:"signature,omitempty"`
 	}
 	params := &serviceConfigRequest{
 		ReportMainCoin: true,

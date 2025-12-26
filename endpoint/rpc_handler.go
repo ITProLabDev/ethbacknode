@@ -1,6 +1,7 @@
 package endpoint
 
 import (
+	"encoding/json"
 	"errors"
 
 	"github.com/ITProLabDev/ethbacknode/address"
@@ -130,6 +131,12 @@ func (r *BackRpc) RegisterSecuredProcessor(method RpcMethod, processor RpcProces
 					response.SetError(ERROR_CODE_SERVER_ERROR, ERROR_MESSAGE_SERVER_ERROR)
 					return
 				}
+				paramsPaw := make(map[string]json.RawMessage)
+				if sign, found := paramsPaw["signature"]; !found || sign == nil {
+					response.SetErrorWithData(ERROR_CODE_UNAUTHORIZED, ERROR_MESSAGE_UNAUTHORIZED, "request signature required")
+					return
+				}
+				//todo validate sign
 			}
 		}
 		processor(ctx, request, response)

@@ -137,6 +137,7 @@ func (r *BackRpc) rpcProcessAddressGetNew(ctx RequestContext, request RpcRequest
 		InvoiceId int64                   `json:"invoiceId"`
 		WatchOnly bool                    `json:"watchOnly"`
 		FullInfo  bool                    `json:"fullInfo"`
+		Signature string                  `json:"signature,omitempty"`
 	}
 	type addressGetNewResponse struct {
 		Success       bool     `json:"success"`
@@ -147,6 +148,7 @@ func (r *BackRpc) rpcProcessAddressGetNew(ctx RequestContext, request RpcRequest
 		WatchOnly     bool     `json:"watchOnly,omitempty"`
 		Bip39Support  bool     `json:"bip39Support,omitempty"`
 		Bip39Mnemonic []string `json:"bip39Mnemonic,omitempty"`
+		Signature     string   `json:"signature,omitempty"`
 	}
 	params := new(addressGetNewRequest)
 	err := request.ParseParams(params)
@@ -230,7 +232,8 @@ func (r *BackRpc) rpcProcessAddressRecover(ctx RequestContext, request RpcReques
 
 func (r *BackRpc) rpcProcessAddressGenerate(ctx RequestContext, request RpcRequest, response RpcResponse) {
 	type addressGenerateRequest struct {
-		MnemonicLen int `json:"mnemonicLen"` //TODO PROCESS VALIDATE
+		MnemonicLen int    `json:"mnemonicLen"` //TODO PROCESS VALIDATE
+		Signature   string `json:"signature,omitempty"`
 	}
 	type addressRecoverResponse struct {
 		Success       bool     `json:"success"`

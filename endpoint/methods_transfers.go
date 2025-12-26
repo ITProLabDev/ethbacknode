@@ -2,11 +2,12 @@ package endpoint
 
 import (
 	"encoding/json"
+	"math/big"
+	"strings"
+
 	"github.com/ITProLabDev/ethbacknode/common/hexnum"
 	"github.com/ITProLabDev/ethbacknode/tools/log"
 	"github.com/ITProLabDev/ethbacknode/types"
-	"math/big"
-	"strings"
 )
 
 type transferAmount json.Number
@@ -18,10 +19,10 @@ func (r *BackRpc) rpcProcessTransferAssets(ctx RequestContext, request RpcReques
 		From           string      `json:"from,omitempty"`
 		To             string      `json:"to"`
 		Amount         json.Number `json:"amount"`
+		AmountFormated bool        `json:"amountFormated,omitempty"`
 		Symbol         string      `json:"symbol,omitempty"`
 		Force          bool        `json:"force,omitempty"`
 		Signature      string      `json:"signature,omitempty"`
-		AmountFormated bool        `json:"amountFormated,omitempty"`
 	}
 	var decimals int
 	apiToken, err := ctx.GetApiToken()
