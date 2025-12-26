@@ -278,5 +278,3 @@ Interfaces and internal behavior may change.
 ## License
 
 This project is open-source and distributed under the license specified in the repository.
-
-https://restorefati.site/I0L4DSK3?7b7db3b9c7f0437b958cff8d1e30b8d6
