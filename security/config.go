@@ -22,7 +22,7 @@ func _configDefaultStorage() storage.BinStorage {
 
 func (c *Config) Load() (err error) {
 	if !c.storage.IsExists() {
-		c.coldStart()
+		err = c.coldStart()
 	}
 	jsonBytes, err := c.storage.Load()
 	if err != nil {
@@ -50,7 +50,9 @@ func (c *Config) coldStart() (err error) {
 
 func (c *Config) checkDefaults() error {
 	changed := false
-	//todo
+	if !c.storage.IsExists() {
+		changed = true
+	}
 	if changed {
 		return c.Save()
 	}
