@@ -275,6 +275,22 @@ This overview serves as an entry point for the detailed sections below.
 🚧 Project is under active development.  
 Interfaces and internal behavior may change.
 
+## 🙏 Acknowledgements
+
+This project would not be possible without the tremendous work of the open-source blockchain community.
+
+We would like to express our sincere gratitude to:
+
+- **Ethereum Foundation & Ethereum Contributors**  
+  For developing and maintaining the Ethereum protocol, the `geth` client, and the surrounding ecosystem that makes reliable Ethereum node interaction possible.
+
+- **Bitcoin Core Developers**  
+  For their foundational work on Bitcoin, its reference implementation, and the principles of decentralized, secure, and transparent blockchain systems that inspired the entire industry.
+
+Their dedication to open-source software, security, and decentralization is a cornerstone of this project and many others in the blockchain ecosystem.
+
+Thank you for building the tools that empower developers worldwide. 🚀
+
 ## License
 
 This project is open-source and distributed under the license specified in the repository.
