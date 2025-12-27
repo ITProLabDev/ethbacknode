@@ -7,9 +7,21 @@ import (
 	"github.com/ITProLabDev/ethbacknode/tools/log"
 )
 
+const (
+	KEY_FORMAT_HEX    = "hex"
+	KEY_FORMAT_JSON   = "json"
+	KEY_FORMAT_BASE58 = "base58"
+
+	SIGNATURE_TYPE_SHA256 = "SHA256"
+	SIGNATURE_TYPE_RIPEMD = "RIPEMD"
+	SIGNATURE_TYPE_SHA512 = "SHA512"
+)
+
 type Config struct {
-	storage storage.BinStorage
-	Debug   bool `json:"debug"`
+	storage       storage.BinStorage
+	Debug         bool   `json:"debug"`
+	KeyFormat     string `json:"defaultKeyFormat"`
+	SignatureType string `json:"signatureType"`
 }
 
 func _configDefaultStorage() storage.BinStorage {
@@ -51,6 +63,14 @@ func (c *Config) coldStart() (err error) {
 func (c *Config) checkDefaults() error {
 	changed := false
 	if !c.storage.IsExists() {
+		changed = true
+	}
+	if c.KeyFormat == "" {
+		c.KeyFormat = KEY_FORMAT_HEX
+		changed = true
+	}
+	if c.SignatureType == "" {
+		c.SignatureType = SIGNATURE_TYPE_SHA256
 		changed = true
 	}
 	if changed {

@@ -179,6 +179,7 @@ Configuration examples will be added as the project evolves.
 - [ ] Logging subsystem refactoring (switch to structured logging)
 - [ ] Re-evaluate Docker support with IPC-safe deployment model
 - [ ] Review security model for outbound HTTP callbacks (event delivery)
+- [ ] Move JSON-RPC stack to separate package 
 
 # ethbacknode JSON-RPC 2.0 API
 
