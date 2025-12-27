@@ -7,12 +7,12 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/ITProLabDev/ethbacknode/abi"
 	"github.com/ITProLabDev/ethbacknode/address"
 	"github.com/ITProLabDev/ethbacknode/clients/ethclient"
 	"github.com/ITProLabDev/ethbacknode/endpoint"
+	"github.com/ITProLabDev/ethbacknode/security"
 	"github.com/ITProLabDev/ethbacknode/storage"
 	"github.com/ITProLabDev/ethbacknode/subscriptions"
 	"github.com/ITProLabDev/ethbacknode/tools/log"
@@ -154,6 +154,10 @@ func main() {
 		txcache.WithConfigStorage(txCacheStorage.GetBinFileStorage("config.json")),
 		txcache.WithTxStorage(txCacheStorage.GetNewBadgerHoldStorage("txcache.db")),
 	)
+	if err != nil {
+		log.Error("Can not start transactions cache manager:", err)
+		os.Exit(-1)
+	}
 	watchdogService.RegisterTransactionEventListen(subscriptionsManager.TransactionEvent)
 	watchdogService.RegisterTransactionEventListen(txCacheManager.TransactionEvent)
 	watchdogService.RegisterBlockEventListen(subscriptionsManager.BlockEvent)
@@ -165,6 +169,17 @@ func main() {
 		log.Error("Can not start watchdog service:", err)
 		os.Exit(-1)
 	}
+
+	securityMaanger := security.NewManager(
+		security.WithStorageManager(storageManager.GetModuleStorage("Security", "security")),
+	)
+
+	err = securityMaanger.Init()
+	if err != nil {
+		log.Error("Can not start security manager:", err)
+		os.Exit(-1)
+	}
+
 	endpointRpcRouter := endpoint.NewBackRpc(
 		addressManager,
 		chainClient,
@@ -175,6 +190,7 @@ func main() {
 			FormPath: "dev/form.html",
 		}),
 		endpoint.WithDebugMode(config.DebugMode),
+		endpoint.WithSecurityManager(securityMaanger),
 	)
 	endpointUrl, err := url.Parse(fmt.Sprintf("http://%s:%s", config.RpcAddress, config.RpcPort))
 	if err != nil {
@@ -212,7 +228,6 @@ func run() {
 			log.Warning("Quit application by OS Signal...")
 			return
 		}
-		time.Sleep(time.Second * 1)
 	}
 }
 
