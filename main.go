@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/ITProLabDev/ethbacknode/abi"
 	"github.com/ITProLabDev/ethbacknode/address"
@@ -206,13 +205,12 @@ func run() {
 	for {
 		select {
 		case _ = <-done:
-			log.Info("Quit application by OS Signal by done...")
+			log.Info("Quit application by done...")
 			return
 		case _ = <-osSig:
 			log.Warning("Quit application by OS Signal...")
 			return
 		}
-		time.Sleep(time.Second * 1)
 	}
 }
 

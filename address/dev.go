@@ -2,6 +2,7 @@ package address
 
 import (
 	"fmt"
+
 	"github.com/ITProLabDev/ethbacknode/tools/log"
 )
 

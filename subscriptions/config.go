@@ -2,6 +2,7 @@ package subscriptions
 
 import (
 	"encoding/json"
+
 	"github.com/ITProLabDev/ethbacknode/storage"
 	"github.com/ITProLabDev/ethbacknode/tools/log"
 )

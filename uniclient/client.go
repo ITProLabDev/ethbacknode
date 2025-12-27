@@ -1,8 +1,9 @@
 package uniclient
 
 import (
-	"github.com/ITProLabDev/ethbacknode/tools/log"
 	"net/http"
+
+	"github.com/ITProLabDev/ethbacknode/tools/log"
 )
 
 type ClientOption func(client *Client)
