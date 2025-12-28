@@ -49,10 +49,10 @@ func NewBackRpc(addressPool *address.Manager, chainClient types.ChainClient, sub
 		rpcProcessors:   make(map[RpcMethod]RpcProcessor),
 		securityManager: security.NewManager(),
 	}
-	r.InitProcessors()
 	for _, option := range options {
 		option(r)
 	}
+	r.InitProcessors()
 	knownTokens := chainClient.TokensList()
 	for _, token := range knownTokens {
 		r.knownTokens[token.Symbol] = token
