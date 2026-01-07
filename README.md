@@ -174,6 +174,7 @@ Configuration examples will be added as the project evolves.
 ## TODO / Roadmap
 
 - [ ] Configuration via environment variables
+- [ ] Migrate configuration to HCL (HashiCorp Configuration Language) format
 - [x] Basic token-based API authorization
 - [ ] CI pipeline (linting, tests, builds)
 - [ ] Logging subsystem refactoring (switch to structured logging)
