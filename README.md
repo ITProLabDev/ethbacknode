@@ -26,6 +26,47 @@ Interaction with the service is performed via **JSON-RPC 2.0**, allowing seamles
 
 The service provides functionality for monitoring blockchain activity, generating Ethereum addresses, and sending transactions, including **ETH and ERC-20 token transfers**.
 
+## What Problem This Project Solves
+
+Building reliable backend systems on top of blockchain nodes is **non-trivial**.  
+Direct interaction with Ethereum nodes requires handling low-level details such as RPC transport, block and transaction tracking, address subscriptions, confirmations, mempool states, and secure delivery of blockchain events to application backends.
+
+**ethbacknode** addresses these challenges by acting as a **dedicated backend service** that:
+
+- Abstracts low-level Ethereum node interaction (primarily via IPC).
+- Continuously tracks blocks, transactions, and address activity.
+- Normalizes blockchain events into a consistent, backend-friendly format.
+- Delivers real-time notifications to client backends via HTTP callbacks or RPC.
+- Separates blockchain infrastructure concerns from business logic.
+
+In short, ethbacknode allows application developers to **focus on product and business logic**, while delegating blockchain-specific complexity, reliability, and monitoring to a specialized service.
+
+---
+
+### When NOT to Use It
+
+While **ethbacknode** is designed to simplify and harden backend interaction with Ethereum nodes, it is **not a universal solution** for all blockchain-related use cases.
+
+You should **avoid using ethbacknode** in the following scenarios:
+
+- **Frontend or client-side applications**  
+  ethbacknode is a backend infrastructure service and is not intended to be exposed directly to browsers or untrusted clients.
+
+- **Simple or one-off scripts**  
+  If you only need to query blockchain data occasionally (e.g. a single balance check or transaction lookup), directly using `geth` JSON-RPC or a hosted provider may be simpler.
+
+- **Highly containerized / serverless environments**  
+  ethbacknode is optimized for **IPC-based communication with geth**, which does not fit well with ephemeral, serverless, or heavily containerized platforms.
+
+- **Multi-blockchain aggregation in a single process**  
+  The service intentionally focuses on **Ethereum only**. If you require unified handling of many heterogeneous blockchains in one binary, a different architecture may be more appropriate.
+
+- **Custodial systems without strict security controls**  
+  If your environment cannot guarantee secure handling of private keys, mnemonics, and callback endpoints, running ethbacknode without additional safeguards is discouraged.
+
+In these cases, alternative approaches such as direct RPC usage, managed blockchain APIs, or purpose-built multi-chain platforms may be a better fit.
+
+
 ## Technology Stack
 
 - **Language:** Golang
@@ -292,6 +333,23 @@ We would like to express our sincere gratitude to:
 Their dedication to open-source software, security, and decentralization is a cornerstone of this project and many others in the blockchain ecosystem.
 
 Thank you for building the tools that empower developers worldwide. 🚀
+
+## Need Customization or Production Setup?
+
+If your use case goes beyond the default scope of **ethbacknode**, you may require additional customization or production-grade hardening.
+
+Typical scenarios where customization may be needed include:
+
+- Supporting **additional blockchains** (e.g. TRON, BSC, or other EVM-compatible networks)
+- Adapting the service to an existing **payment, custody, or wallet infrastructure**
+- Implementing **custom security requirements** (HSM/KMS integration, external signing services, strict key isolation)
+- Designing a **high-availability setup** (failover strategies, redundancy, monitoring)
+- Integrating with **enterprise environments** (custom logging, metrics, alerting, CI/CD, deployment automation)
+
+If you are planning to run ethbacknode in a **production environment** or need tailored functionality, feel free to **contact the author** to discuss architecture, customization options, or long-term support.
+
+Collaboration, contributions, and well-defined extension proposals are always welcome.
+
 
 ## License
 
