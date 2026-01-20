@@ -3,6 +3,12 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+
+	"github.com/hashicorp/hcl/v2/hclsimple"
+	"github.com/hashicorp/hcl/v2/hclwrite"
+	"github.com/zclconf/go-cty/cty"
+
 	"github.com/ITProLabDev/ethbacknode/storage"
 	"github.com/ITProLabDev/ethbacknode/tools/log"
 )
@@ -12,21 +18,21 @@ var (
 )
 
 type Config struct {
-	storage           storage.BinStorage
-	NodeUrl           string            `json:"nodeUrl"`
-	NodePort          string            `json:"nodePort"`
-	NodeUseSSl        bool              `json:"nodeUseSSL"`
-	NodeUseIPC        bool              `json:"nodeUseIPC"`
-	NodeIPCSocket     string            `json:"nodeIPCSocket"`
-	RpcAddress        string            `json:"rpcAddress"`
-	RpcPort           string            `json:"rpcPort"`
-	DataPath          string            `json:"dataPath"`
-	DebugMode         bool              `json:"debug_mode"`
-	ParamsFlags       map[string]bool   `json:"flags"`
-	ParamsString      map[string]string `json:"paramsString"`
-	ParamsInt         map[string]int    `json:"paramsInt"`
-	AdditionalHeaders map[string]string `json:"additionalHeaders"`
-	BurnAddress       string            `json:"burnAddress"`
+	storage           storage.BinStorage `json:"-"`
+	NodeUrl           string             `json:"nodeUrl" hcl:"nodeUrl,attr"`
+	NodePort          string             `json:"nodePort" hcl:"nodePort,attr"`
+	NodeUseSSl        bool               `json:"nodeUseSSL" hcl:"nodeUseSSL,attr"`
+	NodeUseIPC        bool               `json:"nodeUseIPC" hcl:"nodeUseIPC,attr"`
+	NodeIPCSocket     string             `json:"nodeIPCSocket" hcl:"nodeIPCSocket,attr"`
+	RpcAddress        string             `json:"rpcAddress" hcl:"rpcAddress,attr"`
+	RpcPort           string             `json:"rpcPort" hcl:"rpcPort,attr"`
+	DataPath          string             `json:"dataPath" hcl:"dataPath,attr"`
+	DebugMode         bool               `json:"debug_mode" hcl:"debugMode,attr"`
+	ParamsFlags       map[string]bool    `json:"flags" hcl:"flags,optional"`
+	ParamsString      map[string]string  `json:"paramsString" hcl:"paramsString,optional"`
+	ParamsInt         map[string]int     `json:"paramsInt" hcl:"paramsInt,optional"`
+	AdditionalHeaders map[string]string  `json:"additionalHeaders" hcl:"additionalHeaders,optional"`
+	BurnAddress       string             `json:"burnAddress" hcl:"burnAddress,attr"`
 }
 
 func _configDefaultStorage() storage.BinStorage {
@@ -44,19 +50,96 @@ func (c *Config) Load() (err error) {
 			return err
 		}
 	}
-	jsonBytes, err := c.storage.Load()
+	configBytes, err := c.storage.Load()
 	if err != nil {
 		return
 	}
-	err = json.Unmarshal(jsonBytes, c)
+
+	// Detect format by content (first non-whitespace character)
+	// JSON files typically start with '{' or '['
+	trimmedBytes := trimWhitespace(configBytes)
+	if len(trimmedBytes) > 0 && (trimmedBytes[0] == '{' || trimmedBytes[0] == '[') {
+		// JSON format detected - parse as JSON for backward compatibility
+		log.Warning("JSON config format detected. Please migrate to HCL format.")
+		err = json.Unmarshal(configBytes, c)
+		if err != nil {
+			return fmt.Errorf("failed to parse JSON config: %w", err)
+		}
+		// Auto-convert to HCL on next save
+		log.Info("Config loaded from JSON. Will be saved as HCL on next save.")
+		return nil
+	}
+
+	// Try to parse as HCL
+	err = hclsimple.Decode("config.hcl", configBytes, nil, c)
+	if err != nil {
+		return fmt.Errorf("failed to parse HCL config: %w", err)
+	}
+
 	return
 }
 
-func (c *Config) Save() (err error) {
-	data, err := json.MarshalIndent(c, "", " ")
-	if err != nil {
-		return
+// trimWhitespace removes leading whitespace characters
+func trimWhitespace(data []byte) []byte {
+	for i, b := range data {
+		if b != ' ' && b != '\t' && b != '\n' && b != '\r' {
+			return data[i:]
+		}
 	}
+	return data
+}
+
+func (c *Config) Save() (err error) {
+	if c.storage == nil {
+		return ErrConfigStorageEmpty
+	}
+
+	f := hclwrite.NewEmptyFile()
+	body := f.Body()
+
+	// Set scalar attributes
+	body.SetAttributeValue("nodeUrl", cty.StringVal(c.NodeUrl))
+	body.SetAttributeValue("nodePort", cty.StringVal(c.NodePort))
+	body.SetAttributeValue("nodeUseSSL", cty.BoolVal(c.NodeUseSSl))
+	body.SetAttributeValue("nodeUseIPC", cty.BoolVal(c.NodeUseIPC))
+	body.SetAttributeValue("nodeIPCSocket", cty.StringVal(c.NodeIPCSocket))
+	body.SetAttributeValue("rpcAddress", cty.StringVal(c.RpcAddress))
+	body.SetAttributeValue("rpcPort", cty.StringVal(c.RpcPort))
+	body.SetAttributeValue("dataPath", cty.StringVal(c.DataPath))
+	body.SetAttributeValue("debugMode", cty.BoolVal(c.DebugMode))
+	body.SetAttributeValue("burnAddress", cty.StringVal(c.BurnAddress))
+
+	// Set optional maps
+	if len(c.ParamsFlags) > 0 {
+		flagMap := make(map[string]cty.Value)
+		for k, v := range c.ParamsFlags {
+			flagMap[k] = cty.BoolVal(v)
+		}
+		body.SetAttributeValue("flags", cty.MapVal(flagMap))
+	}
+	if len(c.ParamsString) > 0 {
+		stringMap := make(map[string]cty.Value)
+		for k, v := range c.ParamsString {
+			stringMap[k] = cty.StringVal(v)
+		}
+		body.SetAttributeValue("paramsString", cty.MapVal(stringMap))
+	}
+	if len(c.ParamsInt) > 0 {
+		intMap := make(map[string]cty.Value)
+		for k, v := range c.ParamsInt {
+			intMap[k] = cty.NumberIntVal(int64(v))
+		}
+		body.SetAttributeValue("paramsInt", cty.MapVal(intMap))
+	}
+	if len(c.AdditionalHeaders) > 0 {
+		headerMap := make(map[string]cty.Value)
+		for k, v := range c.AdditionalHeaders {
+			headerMap[k] = cty.StringVal(v)
+		}
+		body.SetAttributeValue("additionalHeaders", cty.MapVal(headerMap))
+	}
+
+	data := hclwrite.Format(f.Bytes())
 	err = c.storage.Save(data)
 	return
 }

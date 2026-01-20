@@ -27,7 +27,7 @@ const (
 )
 
 var (
-	globalConfigPath = "config.json"
+	globalConfigPath = "config.hcl"
 	config           = &Config{
 		storage: _configDefaultStorage(),
 	}
@@ -233,7 +233,7 @@ func run() {
 
 func init() {
 	var help bool
-	flag.StringVar(&globalConfigPath, "config", "config.json", "Path to global config file")
+	flag.StringVar(&globalConfigPath, "config", "config.hcl", "Path to global config file")
 	flag.BoolVar(&help, "help", false, "Show help")
 	flag.Parse()
 	if help {
