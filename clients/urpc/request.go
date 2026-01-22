@@ -5,12 +5,14 @@ import (
 	"fmt"
 )
 
+// Parameter type constants for Request serialization.
 const (
-	paramsTypeNamed = iota
-	paramsTypeArray
-	paramsTypeRaw
+	paramsTypeNamed = iota // Named parameters (object)
+	paramsTypeArray        // Positional parameters (array)
+	paramsTypeRaw          // Raw JSON parameters
 )
 
+// NewRequest creates a new JSON-RPC 2.0 request with positional parameters.
 func NewRequest(method string, params ...interface{}) (req *Request) {
 	req = &Request{
 		Id:         "1",
@@ -23,6 +25,7 @@ func NewRequest(method string, params ...interface{}) (req *Request) {
 	}
 	return
 }
+// NewRequestWithNamedParams creates a new JSON-RPC 2.0 request with named parameters.
 func NewRequestWithNamedParams(method string, params map[string]interface{}) (req *Request) {
 	req = &Request{
 		Id:          "1",
@@ -38,6 +41,8 @@ func NewRequestWithNamedParams(method string, params map[string]interface{}) (re
 	}
 	return
 }
+
+// NewRequestWithRawParams creates a new JSON-RPC 2.0 request with raw JSON parameters.
 func NewRequestWithRawParams(method string, params json.RawMessage) (req *Request) {
 	req = &Request{
 		Id:         "1",
@@ -48,6 +53,9 @@ func NewRequestWithRawParams(method string, params json.RawMessage) (req *Reques
 	}
 	return
 }
+
+// NewRequestWithObject creates a new JSON-RPC 2.0 request with parameters from a struct.
+// The params object is marshaled to JSON.
 func NewRequestWithObject(method string, params interface{}) (req *Request) {
 	paramsBytes, _ := json.Marshal(params)
 	req = &Request{
@@ -60,6 +68,7 @@ func NewRequestWithObject(method string, params interface{}) (req *Request) {
 	return
 }
 
+// Request represents a JSON-RPC 2.0 request.
 type Request struct {
 	Id           RequestId              `json:"id"`
 	JsonRpc      string                 `json:"jsonrpc"`
@@ -71,27 +80,33 @@ type Request struct {
 	paramsType   int
 }
 
+// SetId sets the request ID.
 func (r *Request) SetId(id RequestId) {
 	r.Id = id
 }
 
+// SetNamedParam sets a named parameter.
 func (r *Request) SetNamedParam(key string, value interface{}) {
 	r.ParamsNamed[key] = value
 }
 
+// AddParams appends positional parameters.
 func (r *Request) AddParams(values ...interface{}) {
 	r.ParamsArray = append(r.ParamsArray, values...)
 }
 
+// SetParams replaces all positional parameters.
 func (r *Request) SetParams(values ...interface{}) {
 	r.ParamsArray = values
 }
 
+// String returns a pretty-printed JSON representation of the request.
 func (r *Request) String() string {
 	b, _ := json.MarshalIndent(r, "", " ")
 	return string(b)
 }
 
+// MarshalJSON implements custom JSON marshaling for JSON-RPC 2.0 format.
 func (r *Request) MarshalJSON() ([]byte, error) {
 	var params string
 	switch r.paramsType {
@@ -121,12 +136,16 @@ func (r *Request) MarshalJSON() ([]byte, error) {
 	return []byte(fmt.Sprintf(`{"jsonrpc":"%s","method":"%s","params":%s,"id":%s}`, r.JsonRpc, r.Method, params, r.Id)), nil
 }
 
+// RequestId is a JSON-RPC request identifier.
+// Stored as string but marshaled as numeric for JSON-RPC compatibility.
 type RequestId string
 
+// String returns the string representation of the request ID.
 func (id RequestId) String() string {
 	return string(id)
 }
 
+// MarshalJSON serializes the ID as a number (JSON-RPC standard).
 func (id RequestId) MarshalJSON() ([]byte, error) {
 	if id == "" {
 		return []byte("0"), nil
@@ -135,6 +154,7 @@ func (id RequestId) MarshalJSON() ([]byte, error) {
 	return []byte(out), nil
 }
 
+// UnmarshalJSON deserializes a numeric ID, stripping quotes and leading zeros.
 func (id *RequestId) UnmarshalJSON(data []byte) error {
 	var dc []byte
 	fc := true

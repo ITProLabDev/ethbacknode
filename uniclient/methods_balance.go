@@ -5,6 +5,7 @@ import (
 	"github.com/ITProLabDev/ethbacknode/tools/log"
 )
 
+// BalanceGetForAddress retrieves the balance of a specific asset for an address.
 func (c *Client) BalanceGetForAddress(address string, symbol string) (balance string, err error) {
 	type addressBalanceRequest struct {
 		Address   string `json:"address"`
@@ -31,6 +32,7 @@ func (c *Client) BalanceGetForAddress(address string, symbol string) (balance st
 	}
 	return "", ErrInvalidBalanceResponse
 }
+// BalanceGetForAddressAllAssets retrieves balances for all assets at an address.
 func (c *Client) BalanceGetForAddressAllAssets(address string) (balance map[string]json.Number, err error) {
 	type addressBalanceRequest struct {
 		Address   string `json:"address"`

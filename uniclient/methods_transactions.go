@@ -2,6 +2,7 @@ package uniclient
 
 import "encoding/json"
 
+// TransferInfo contains details about a blockchain transfer.
 type TransferInfo struct {
 	TxID              string      `json:"tx_id"`
 	Timestamp         int64       `json:"timestamp"`
@@ -24,6 +25,7 @@ type TransferInfo struct {
 	ChainSpecificData []byte      `json:"chainSpecificData,omitempty"`
 }
 
+// TransferInfo retrieves details about a specific transaction by ID.
 func (c *Client) TransferInfo(txID string) (transferResult *TransferInfo, err error) {
 	request := NewRequest("transferInfo", map[string]interface{}{
 		"txId":           txID,
@@ -37,6 +39,7 @@ func (c *Client) TransferInfo(txID string) (transferResult *TransferInfo, err er
 	return transferResponse, nil
 }
 
+// TransfersByAddress retrieves all transfers involving the given address.
 func (c *Client) TransfersByAddress(address string) (transfersList []*TransferInfo, err error) {
 	request := NewRequest("transferInfoForAddress", map[string]interface{}{
 		"address":        address,

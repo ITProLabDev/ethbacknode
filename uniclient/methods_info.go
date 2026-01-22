@@ -1,5 +1,6 @@
 package uniclient
 
+// TokenInfo describes an ERC-20 or other token contract.
 type TokenInfo struct {
 	ContractAddress string `json:"contractAddress,omitempty"`
 	Name            string `json:"name"`
@@ -8,6 +9,7 @@ type TokenInfo struct {
 	Protocol        string `json:"protocol,omitempty"`
 }
 
+// NodeInfo describes the EthBackNode server and supported tokens.
 type NodeInfo struct {
 	Blockchain string       `json:"blockchain"`
 	Id         string       `json:"id"`
@@ -17,6 +19,7 @@ type NodeInfo struct {
 	Tokens     []*TokenInfo `json:"tokens"`
 }
 
+// GetNodeInfo retrieves information about the node, including supported tokens.
 func (c *Client) GetNodeInfo() (nodeInfo *NodeInfo, err error) {
 	request := NewRequest("getNodeInfo", nil)
 	nodeInfo = new(NodeInfo)

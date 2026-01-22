@@ -5,6 +5,8 @@ import (
 	"github.com/ITProLabDev/ethbacknode/types"
 )
 
+// processMemPool processes pending transactions from the mempool.
+// Skips unsuccessful transactions and processes each for managed addresses.
 func (w *Service) processMemPool(pool []*types.TransferInfo) {
 	//log.Dump("Process mempool:", pool)
 	for _, tx := range pool {

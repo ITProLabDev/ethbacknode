@@ -5,6 +5,9 @@ import (
 	"time"
 )
 
+// runLoop is the main monitoring loop that polls the blockchain.
+// Checks mempool content and processes new blocks at configured intervals.
+// Handles block catch-up when multiple blocks have been missed.
 func (w *Service) runLoop() {
 	blockchain := w.client.GetChainName()
 	lastSeenBlock := w.state.LastBlockNum

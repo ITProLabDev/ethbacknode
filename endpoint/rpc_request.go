@@ -6,10 +6,13 @@ import (
 	"strconv"
 )
 
+// RpcMethod is the name of an RPC method.
 type RpcMethod string
 
+// RpcProcessor is a function that handles an RPC request.
 type RpcProcessor func(ctx RequestContext, request RpcRequest, response RpcResponse)
 
+// JsonRpcRequest represents a JSON-RPC 2.0 request.
 type JsonRpcRequest struct {
 	Id        RequestId       `json:"id"`
 	JsonRpc   string          `json:"jsonrpc"`
@@ -18,14 +21,17 @@ type JsonRpcRequest struct {
 	paramsMap map[string]interface{}
 }
 
+// GetMethod returns the RPC method name.
 func (r *JsonRpcRequest) GetMethod() (method RpcMethod) {
 	return r.Method
 }
 
+// ParseParams unmarshals the request parameters into the provided struct.
 func (r *JsonRpcRequest) ParseParams(params interface{}) (err error) {
 	return json.Unmarshal(r.Params, params)
 }
 
+// GetParamString extracts a string parameter by key.
 func (r *JsonRpcRequest) GetParamString(key string) (param string, err error) {
 	if r.paramsMap == nil {
 		err = r.parseParamsMap()
@@ -47,6 +53,7 @@ func (r *JsonRpcRequest) GetParamString(key string) (param string, err error) {
 	return
 }
 
+// GetParamInt extracts an integer parameter by key.
 func (r *JsonRpcRequest) GetParamInt(key string) (param int64, err error) {
 	if r.paramsMap == nil {
 		err = r.parseParamsMap()
@@ -81,6 +88,7 @@ func (r *JsonRpcRequest) GetParamInt(key string) (param int64, err error) {
 	return
 }
 
+// GetParamBool extracts a boolean parameter by key.
 func (r *JsonRpcRequest) GetParamBool(key string) (value bool, err error) {
 	if r.paramsMap == nil {
 		err = r.parseParamsMap()
@@ -118,6 +126,7 @@ func (r *JsonRpcRequest) GetParamBool(key string) (value bool, err error) {
 	return
 }
 
+// GetParamRaw extracts a raw parameter value by key.
 func (r *JsonRpcRequest) GetParamRaw(key string) (param interface{}, found bool) {
 	if r.paramsMap == nil {
 		r.parseParamsMap()
@@ -126,6 +135,7 @@ func (r *JsonRpcRequest) GetParamRaw(key string) (param interface{}, found bool)
 	return
 }
 
+// GetParamFloat64 extracts a float64 parameter by key.
 func (r *JsonRpcRequest) GetParamFloat64(key string) (param float64, err error) {
 	if r.paramsMap == nil {
 		err = r.parseParamsMap()

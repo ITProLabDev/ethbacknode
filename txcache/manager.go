@@ -1,3 +1,6 @@
+// Package txcache provides transaction caching and confirmation tracking.
+// It stores transaction records with confirmation counts and provides
+// query APIs for retrieving transactions by hash or address.
 package txcache
 
 import (
@@ -5,8 +8,11 @@ import (
 	"sync"
 )
 
+// ManagerOption is a function that configures a Manager.
 type ManagerOption func(*Manager) error
 
+// NewManager creates a new transaction cache manager with the specified options.
+// Loads configuration and starts the event processing loop.
 func NewManager(options ...ManagerOption) (*Manager, error) {
 	manager := &Manager{
 		config:    NewConfig(),
@@ -26,6 +32,8 @@ func NewManager(options ...ManagerOption) (*Manager, error) {
 	return manager, nil
 }
 
+// Manager manages the transaction cache.
+// Stores transactions with confirmation tracking and provides query APIs.
 type Manager struct {
 	config    *Config
 	txCache   *storage.BadgerHoldStorage
@@ -33,6 +41,7 @@ type Manager struct {
 	mux       sync.RWMutex
 }
 
+// eventLoop processes events from the event pipe sequentially.
 func (m *Manager) eventLoop() {
 	for {
 		select {

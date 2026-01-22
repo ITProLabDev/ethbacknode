@@ -7,6 +7,8 @@ import (
 	"math/big"
 )
 
+// getTransactionById retrieves a transaction record by its ID.
+// Returns ErrUnknownTransaction if not found.
 func (s *Manager) getTransactionById(txId string) (tx *TransferInfoRecord, err error) {
 	tx = new(TransferInfoRecord)
 	s.transactionPool.Do(func(db *badgerhold.Store) {
@@ -20,12 +22,15 @@ func (s *Manager) getTransactionById(txId string) (tx *TransferInfoRecord, err e
 	}
 	return tx, nil
 }
+// saveTransaction persists a transaction record to storage.
 func (s *Manager) saveTransaction(tx *TransferInfoRecord) (err error) {
 	s.transactionPool.Do(func(db *badgerhold.Store) {
 		err = db.Upsert(tx.TxID, tx)
 	})
 	return err
 }
+// SearchTransactionsBeforeBlock finds unconfirmed transactions in blocks before the given number.
+// Used to detect transactions that have reached confirmation threshold.
 func (s *Manager) SearchTransactionsBeforeBlock(blockNum int) (txList []*TransferInfoRecord, err error) {
 	s.transactionPool.Do(func(db *badgerhold.Store) {
 		err = db.Find(&txList, badgerhold.Where(
@@ -40,6 +45,8 @@ func (s *Manager) SearchTransactionsBeforeBlock(blockNum int) (txList []*Transfe
 	}
 	return txList, nil
 }
+// SearchTransactionsAfterBlock finds unconfirmed transactions in blocks after the given number.
+// Used to track pending confirmation updates.
 func (s *Manager) SearchTransactionsAfterBlock(blockNum int) (txList []*TransferInfoRecord, err error) {
 	s.transactionPool.Do(func(db *badgerhold.Store) {
 		err = db.Find(&txList, badgerhold.Where(
@@ -55,6 +62,8 @@ func (s *Manager) SearchTransactionsAfterBlock(blockNum int) (txList []*Transfer
 	return txList, nil
 }
 
+// TransferInfoRecord is the persistent storage format for transaction data.
+// Stored in BadgerHold with indexed fields for efficient queries.
 type TransferInfoRecord struct {
 	TxID              string   `json:"tx_id" badgerhold:"key"`
 	Timestamp         int64    `json:"timestamp"`
@@ -76,6 +85,7 @@ type TransferInfoRecord struct {
 	ChainSpecificData []byte   `json:"chainSpecificData,omitempty"`
 }
 
+// fillFromTransferInfo populates the record from a TransferInfo struct.
 func (t *TransferInfoRecord) fillFromTransferInfo(info *types.TransferInfo) *TransferInfoRecord {
 	t.TxID = info.TxID
 	t.Timestamp = info.Timestamp
@@ -97,6 +107,7 @@ func (t *TransferInfoRecord) fillFromTransferInfo(info *types.TransferInfo) *Tra
 	return t
 }
 
+// toTransferInfo copies the record data to a TransferInfo struct.
 func (t *TransferInfoRecord) toTransferInfo(info *types.TransferInfo) {
 	info.TxID = t.TxID
 	info.Timestamp = t.Timestamp
@@ -117,6 +128,7 @@ func (t *TransferInfoRecord) toTransferInfo(info *types.TransferInfo) {
 	info.ChainSpecificData = t.ChainSpecificData
 }
 
+// isEqual compares the record with a TransferInfo for equality.
 func (t *TransferInfoRecord) isEqual(tx *types.TransferInfo) bool {
 	if t.TxID != tx.TxID {
 		return false

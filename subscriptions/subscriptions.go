@@ -7,8 +7,11 @@ import (
 	"github.com/ITProLabDev/ethbacknode/tools/log"
 )
 
+// ServiceId is a unique identifier for a service subscription.
 type ServiceId int
 
+// NewSubscription creates a new subscription with the given service ID and endpoint URL.
+// The fillSettings function allows customizing subscription settings.
 func NewSubscription(serviceId ServiceId, endpointUrl string, fillSettings func(s *Subscription)) *Subscription {
 	subscription := &Subscription{
 		ServiceId:   serviceId,
@@ -18,6 +21,7 @@ func NewSubscription(serviceId ServiceId, endpointUrl string, fillSettings func(
 	return subscription
 }
 
+// subscriptionsSave persists all subscriptions to storage.
 func (s *Manager) subscriptionsSave() error {
 	b, err := json.MarshalIndent(s.subscribers, "", "\t")
 	if err != nil {
@@ -25,6 +29,7 @@ func (s *Manager) subscriptionsSave() error {
 	}
 	return s.subscribersStorage.Save(b)
 }
+// subscriptionsLoad loads subscriptions from storage.
 func (s *Manager) subscriptionsLoad() error {
 	s.subscribers = make(map[ServiceId]*Subscription)
 	if !s.subscribersStorage.IsExists() {
@@ -37,6 +42,7 @@ func (s *Manager) subscriptionsLoad() error {
 	return json.Unmarshal(b, &s.subscribers)
 }
 
+// subscriptionsColdStart initializes subscriptions with a default internal service.
 func (s *Manager) subscriptionsColdStart() error {
 	s.subscribers[0] = &Subscription{
 		ServiceId: 0,
@@ -46,6 +52,7 @@ func (s *Manager) subscriptionsColdStart() error {
 	return s.subscribersStorage.Save(b)
 }
 
+// subscriptionViewAll iterates over all subscriptions with a read lock.
 func (s *Manager) subscriptionViewAll(viewver func(s *Subscription)) {
 	s.subscribersMux.RLock()
 	defer s.subscribersMux.RUnlock()
@@ -54,6 +61,8 @@ func (s *Manager) subscriptionViewAll(viewver func(s *Subscription)) {
 	}
 }
 
+// SubscriptionGet retrieves a subscription by service ID.
+// Returns ErrUnknownServiceId if not found.
 func (s *Manager) SubscriptionGet(serviceId ServiceId) (subscription *Subscription, err error) {
 	s.subscribersMux.RLock()
 	defer s.subscribersMux.RUnlock()
@@ -66,6 +75,8 @@ func (s *Manager) SubscriptionGet(serviceId ServiceId) (subscription *Subscripti
 
 }
 
+// SubscriptionEdit modifies a subscription using the provided edit function.
+// Persists changes after editing.
 func (s *Manager) SubscriptionEdit(serviceId ServiceId, edit func(subscription *Subscription)) (err error) {
 	s.subscribersMux.RLock()
 	subscriptionMaster, found := s.subscribers[serviceId]
@@ -79,6 +90,8 @@ func (s *Manager) SubscriptionEdit(serviceId ServiceId, edit func(subscription *
 	return s.subscriptionsSave()
 }
 
+// Subscription represents a service's subscription configuration.
+// Controls what events to report and where to send notifications.
 type Subscription struct {
 	rpc                  *urpc.Client
 	ServiceName          string          `json:"serviceName"`
@@ -101,6 +114,7 @@ type Subscription struct {
 	SecurityUseEncryption bool `json:"securityUseEncryption,omitempty"`
 }
 
+// equal compares two subscriptions for equality.
 func (s *Subscription) equal(with *Subscription) bool {
 	if s.ServiceName != with.ServiceName {
 		return false
@@ -148,6 +162,8 @@ func (s *Subscription) equal(with *Subscription) bool {
 	return true
 }
 
+// sendNotification sends an RPC notification to the subscriber's endpoint.
+// For internal subscriptions, logs the notification instead.
 func (s *Subscription) sendNotification(method string, message interface{}, debug bool) {
 	if s.Internal || s.EndpointUrl == "" {
 		log.Debug("Internal notification:", method)
@@ -171,6 +187,7 @@ func (s *Subscription) sendNotification(method string, message interface{}, debu
 	}
 }
 
+// Signer defines an interface for signing notification payloads.
 type Signer interface {
 	Sign(apiKey string)
 }

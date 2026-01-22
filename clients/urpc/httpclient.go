@@ -9,12 +9,16 @@ import (
 	"net/url"
 )
 
+// httpClient implements rpcTransport and restTransport over HTTP.
+// Supports custom headers for authentication and identification.
 type httpClient struct {
-	additionalHeaders map[string]string
-	httpUrl           string
-	http              *http.Client
+	additionalHeaders map[string]string // Custom HTTP headers
+	httpUrl           string            // Base URL for requests
+	http              *http.Client      // Underlying HTTP client
 }
 
+// Call sends a JSON-RPC request over HTTP POST.
+// Encodes the request as JSON and decodes the response.
 func (c *httpClient) Call(request interface{}, response interface{}) (err error) {
 	requestBuffer := new(bytes.Buffer)
 	err = json.NewEncoder(requestBuffer).Encode(request)
@@ -38,6 +42,7 @@ func (c *httpClient) Call(request interface{}, response interface{}) (err error)
 	return err
 }
 
+// Get performs an HTTP GET request to the specified URI with query parameters.
 func (c *httpClient) Get(uri string, params map[string]interface{}, response interface{}) (err error) {
 	urlParsed, err := url.Parse(c.httpUrl)
 	if err != nil {
@@ -63,6 +68,7 @@ func (c *httpClient) Get(uri string, params map[string]interface{}, response int
 	return json.NewDecoder(httpResponse.Body).Decode(response)
 }
 
+// Post performs an HTTP POST request to the specified URI with JSON body.
 func (c *httpClient) Post(uri string, request interface{}, response interface{}) (err error) {
 	urlParsed, err := url.Parse(c.httpUrl)
 	if err != nil {
@@ -94,6 +100,8 @@ func (c *httpClient) Post(uri string, request interface{}, response interface{})
 	return json.NewDecoder(httpResponse.Body).Decode(response)
 }
 
+// AddHeader adds or updates a custom HTTP header.
+// Headers are included in all subsequent requests.
 func (c *httpClient) AddHeader(key, value string) {
 	if c.additionalHeaders == nil {
 		c.additionalHeaders = make(map[string]string)

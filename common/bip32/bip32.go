@@ -1,3 +1,5 @@
+// Package bip32 implements the BIP-32 hierarchical deterministic wallet specification.
+// It provides key derivation, serialization, and management for HD wallets.
 package bip32
 
 import (

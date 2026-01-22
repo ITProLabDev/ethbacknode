@@ -5,6 +5,8 @@ import (
 	"github.com/ITProLabDev/ethbacknode/tools/log"
 )
 
+// gatherNativeCoinToMaster transfers received funds to the master address.
+// Only executes if the service has GatherToMaster enabled and has master addresses configured.
 func (s *Manager) gatherNativeCoinToMaster(address *address.Address, txInfo *TransferNotification) {
 	serviceInfo, err := s.SubscriptionGet(ServiceId(address.ServiceId))
 	if err != nil {

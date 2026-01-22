@@ -2,6 +2,8 @@
 // Use of this source code is governed by the MIT
 // license that can be found in the LICENSE file.
 
+// Package bip44 implements the BIP-44 multi-account hierarchy for HD wallets.
+// It provides coin type constants and key derivation paths per SLIP-0044.
 package bip44
 
 import (
@@ -111,6 +113,8 @@ const (
 	TypeFactomIdentity        uint32 = 0x80000119
 )
 
+// NewKeyFromMnemonic derives a BIP-44 key from a mnemonic phrase.
+// Path: m/44'/coin'/account'/chain/address
 func NewKeyFromMnemonic(mnemonic string, coin, account, chain, address uint32) (*bip32.Key, error) {
 	seed, err := bip39.NewSeedWithErrorChecking(mnemonic, "")
 	if err != nil {
@@ -125,6 +129,8 @@ func NewKeyFromMnemonic(mnemonic string, coin, account, chain, address uint32) (
 	return NewKeyFromMasterKey(masterKey, coin, account, chain, address)
 }
 
+// NewKeyFromMasterKey derives a BIP-44 key from an existing master key.
+// Path: m/44'/coin'/account'/chain/address
 func NewKeyFromMasterKey(masterKey *bip32.Key, coin, account, chain, address uint32) (*bip32.Key, error) {
 	child, err := masterKey.NewChildKey(Purpose)
 	if err != nil {

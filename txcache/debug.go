@@ -5,6 +5,7 @@ import (
 	"github.com/timshannon/badgerhold"
 )
 
+// DumpDb is a debug utility that logs all unconfirmed transactions.
 func (m *Manager) DumpDb() {
 	var txList []*TransferInfoCachedRecord
 	var err error

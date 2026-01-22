@@ -1,3 +1,6 @@
+// Package ethclient provides an Ethereum blockchain client that implements
+// the types.ChainClient interface. It supports balance queries, transaction
+// monitoring, and coin/token transfers via JSON-RPC.
 package ethclient
 
 import (
@@ -12,12 +15,18 @@ import (
 	"strings"
 )
 
+// Option is a function that configures a Client.
 type Option func(*Client)
 
+// Default confirmation count constants.
 const (
+	// DEFAULT_CONFIRMATIONS is the default number of block confirmations
+	// required before a transaction is considered finalized.
 	DEFAULT_CONFIRMATIONS = 12
 )
 
+// NewClient creates a new Ethereum client with the specified options.
+// Default configuration: Ethereum mainnet, 18 decimals, 12 confirmations.
 func NewClient(options ...Option) *Client {
 	client := &Client{
 		config:           &Config{storage: _configDefaultStorage()},
@@ -34,23 +43,28 @@ func NewClient(options ...Option) *Client {
 	return client
 }
 
+// Client is the main Ethereum blockchain client.
+// It implements the types.ChainClient interface.
 type Client struct {
-	config           *Config
-	chainName        string
-	chainId          string
-	chainSymbol      string
-	decimals         int
-	abi              *abi.SmartContractsManager
-	rpcClient        *urpc.Client
-	addressCodec     address.AddressCodec
-	tokens           []*types.TokenInfo
-	minConfirmations int
+	config           *Config                    // Client configuration
+	chainName        string                     // Human-readable chain name
+	chainId          string                     // Chain identifier
+	chainSymbol      string                     // Native currency symbol (ETH)
+	decimals         int                        // Native currency decimals (18)
+	abi              *abi.SmartContractsManager // Smart contract ABI manager
+	rpcClient        *urpc.Client               // JSON-RPC client
+	addressCodec     address.AddressCodec       // Address encoder/decoder
+	tokens           []*types.TokenInfo         // Supported tokens list
+	minConfirmations int                        // Required confirmations
 }
 
+// BalanceOf returns the native coin balance of an address in wei.
 func (c *Client) BalanceOf(address string) (balance *big.Int, err error) {
 	return c.GetBalance(address)
 }
 
+// TokensBalanceOf returns the token balance of an address.
+// Accepts token symbol or contract address.
 func (c *Client) TokensBalanceOf(address string, token string) (balance *big.Int, err error) {
 	tokenInfo, ok := c.tokenGetIfExistBySymbol(token)
 	if !ok {
@@ -62,6 +76,8 @@ func (c *Client) TokensBalanceOf(address string, token string) (balance *big.Int
 	return c.ContractGetBalanceOf(tokenInfo.ContractAddress, address)
 }
 
+// Init loads configuration and initializes the client.
+// Must be called before using the client.
 func (c *Client) Init() error {
 	err := c.config.Load()
 	if err != nil {

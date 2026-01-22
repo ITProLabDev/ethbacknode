@@ -1,5 +1,6 @@
 package watchdog
 
+// PullEvent represents an external event request for transaction or block lookup.
 type PullEvent struct {
 	txEvent    bool
 	txId       string
@@ -9,6 +10,8 @@ type PullEvent struct {
 
 //TODO: subscription to events for external modules
 
+// pullEventWatcher listens for external pull event requests.
+// Processes events from the pull channel until the service is stopped.
 func (w *Service) pullEventWatcher() {
 	for {
 		select {
@@ -22,6 +25,8 @@ func (w *Service) pullEventWatcher() {
 	}
 }
 
+// processPullEvent handles an external pull event request.
+// TODO: Implementation pending.
 func (w *Service) processPullEvent(event *PullEvent) {
 	//todo
 }

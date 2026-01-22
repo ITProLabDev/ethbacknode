@@ -49,6 +49,7 @@ func ParseBigInt(value string) (*big.Int, error) {
 	return i, err
 }
 
+// ParseHexBytes parses a hex string (with optional "0x" prefix) to a byte slice.
 func ParseHexBytes(value string) ([]byte, error) {
 	return hex.DecodeString(strings.TrimPrefix(value, "0x"))
 }

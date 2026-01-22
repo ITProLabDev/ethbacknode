@@ -5,6 +5,9 @@ import (
 	"github.com/ITProLabDev/ethbacknode/types"
 )
 
+// processTx checks if a transaction involves any managed addresses.
+// Fires a transaction event if the sender or recipient is managed.
+// Avoids duplicate events when both parties are managed.
 func (w *Service) processTx(tx *types.TransferInfo) error {
 	eventSent := false
 	if w.addressPool.IsAddressKnown(tx.From) {

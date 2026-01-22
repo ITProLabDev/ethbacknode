@@ -2,6 +2,9 @@ package address
 
 import "github.com/ITProLabDev/ethbacknode/tools/log"
 
+// checkFreeAddressPool monitors the free address pool size and triggers refill if needed.
+// Automatically generates new addresses when pool drops below MinFreePoolSize.
+// Thread-safe operation.
 func (p *Manager) checkFreeAddressPool() {
 	var totalAddresses, freeAddresses int
 	p.mux.RLock()
@@ -25,6 +28,9 @@ func (p *Manager) checkFreeAddressPool() {
 	}
 }
 
+// refillFreeAddressPool generates new addresses to replenish the free pool.
+// Uses BIP-39/44 if enabled, otherwise generates random addresses.
+// Thread-safe operation.
 func (p *Manager) refillFreeAddressPool(refillAmount int) {
 	p.mux.Lock()
 	defer p.mux.Unlock()
