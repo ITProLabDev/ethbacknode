@@ -1,5 +1,6 @@
 package uniclient
 
+// AddressInfo contains information about a managed address.
 type AddressInfo struct {
 	Address       string   `json:"address"`
 	PrivateKey    string   `json:"privateKey,omitempty"`
@@ -10,6 +11,7 @@ type AddressInfo struct {
 	Bip39Mnemonic []string `json:"bip39Mnemonic,omitempty"`
 }
 
+// AddressGetNew generates a new address for the given user and invoice.
 func (c *Client) AddressGetNew(userId, invoiceId int64, watchOnly bool) (addressInfo *AddressInfo, err error) {
 	type addressGetNewRequest struct {
 		ServiceId int   `json:"serviceId"`
@@ -46,6 +48,7 @@ func (c *Client) AddressGetNew(userId, invoiceId int64, watchOnly bool) (address
 	}, nil
 }
 
+// AddressGetNewFullInfo generates a new address and returns full info including private key.
 func (c *Client) AddressGetNewFullInfo(userId, invoiceId int64, watchOnly bool) (addressInfo *AddressInfo, err error) {
 	type addressGetNewRequest struct {
 		ServiceId int   `json:"serviceId"`

@@ -7,14 +7,14 @@ import (
 	"math/big"
 )
 
-// mac returns an HMAC of the given key and message.
+// mac computes an HMAC of the given key and message using the specified hash algorithm.
 func mac(alg func() hash.Hash, k, m, buf []byte) []byte {
 	h := hmac.New(alg, k)
 	h.Write(m)
 	return h.Sum(buf[:0])
 }
 
-// https://tools.ietf.org/html/rfc6979#section-2.3.2
+// bits2int converts a byte slice to a big.Int per RFC 6979 section 2.3.2.
 func bits2int(in []byte, qlen int) *big.Int {
 	vlen := len(in) * 8
 	v := new(big.Int).SetBytes(in)
@@ -24,7 +24,7 @@ func bits2int(in []byte, qlen int) *big.Int {
 	return v
 }
 
-// https://tools.ietf.org/html/rfc6979#section-2.3.3
+// int2octets converts a big.Int to a byte slice per RFC 6979 section 2.3.3.
 func int2octets(v *big.Int, rolen int) []byte {
 	out := v.Bytes()
 
@@ -45,7 +45,7 @@ func int2octets(v *big.Int, rolen int) []byte {
 	return out
 }
 
-// https://tools.ietf.org/html/rfc6979#section-2.3.4
+// bits2octets converts bits to octets per RFC 6979 section 2.3.4.
 func bits2octets(in []byte, q *big.Int, qlen, rolen int) []byte {
 	z1 := bits2int(in, qlen)
 	z2 := new(big.Int).Sub(z1, q)
@@ -57,7 +57,8 @@ func bits2octets(in []byte, q *big.Int, qlen, rolen int) []byte {
 
 var one = big.NewInt(1)
 
-// https://tools.ietf.org/html/rfc6979#section-3.2
+// generateSecret generates a deterministic secret k per RFC 6979 section 3.2.
+// Uses HMAC-based deterministic signature scheme for ECDSA.
 func generateSecret(q, x *big.Int, alg func() hash.Hash, hash []byte, test func(*big.Int) bool) {
 	qlen := q.BitLen()
 	holen := alg().Size()

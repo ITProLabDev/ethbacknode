@@ -5,6 +5,8 @@ import (
 	"github.com/timshannon/badgerhold"
 )
 
+// blockUpdateEvent updates confirmation counts for recent transactions.
+// Marks transactions as confirmed when they exceed the confirmation threshold.
 func (m *Manager) blockUpdateEvent(blockNum int64) {
 	m.mux.Lock()
 	defer m.mux.Unlock()

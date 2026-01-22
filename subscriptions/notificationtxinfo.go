@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+// TransferNotification is the payload sent to subscribers for transaction events.
+// Includes confirmation count, user/invoice IDs, and optional signature for verification.
 type TransferNotification struct {
 	ChainId       string   `json:"chainId"`
 	TxID          string   `json:"tx_id"`
@@ -31,6 +33,8 @@ type TransferNotification struct {
 	Signature     string   `json:"sign,omitempty"`
 }
 
+// Sign generates an HMAC-SHA256 signature for the notification using the API key.
+// The signature covers all critical fields to prevent tampering.
 func (n *TransferNotification) Sign(apiKey string) {
 	bodyParts := []string{
 		n.TxID,
@@ -52,6 +56,7 @@ func (n *TransferNotification) Sign(apiKey string) {
 	}
 	n.Signature = fmt.Sprintf("%x", sha256.Sum256([]byte(strings.Join(bodyParts, ":"))))
 }
+// fill populates the notification from a TransferInfoRecord.
 func (n *TransferNotification) fill(tx *TransferInfoRecord) *TransferNotification {
 	n.TxID = tx.TxID
 	n.Timestamp = tx.Timestamp

@@ -8,6 +8,7 @@ import (
 	"math/big"
 )
 
+// NewEthTxSigner creates a new Ethereum transaction signer with the given parameters.
 func NewEthTxSigner(nonce uint64, gasPrice *big.Int, gas uint64, To []byte, value *big.Int, data []byte) *EthTxSigner {
 	return &EthTxSigner{
 		Nonce:    nonce,
@@ -19,6 +20,8 @@ func NewEthTxSigner(nonce uint64, gasPrice *big.Int, gas uint64, To []byte, valu
 	}
 }
 
+// EthTxSigner represents an Ethereum transaction with signing capabilities.
+// Supports EIP-155 chain ID for replay protection.
 type EthTxSigner struct {
 	chainId  *big.Int
 	Nonce    uint64   // nonce of sender account
@@ -30,10 +33,13 @@ type EthTxSigner struct {
 	V, R, S  *big.Int // signature values
 }
 
+// SetChainId sets the EIP-155 chain ID for replay protection.
 func (tx *EthTxSigner) SetChainId(id *big.Int) {
 	tx.chainId = id
 }
 
+// Sign creates an ECDSA signature for the transaction using RFC 6979.
+// Returns 65-byte signature in [R || S || V] format and populates V, R, S fields.
 func (tx *EthTxSigner) Sign(privateKey *ecdsa.PrivateKey) (sig []byte) {
 
 	digestHash := tx.Hash()
@@ -64,6 +70,7 @@ func (tx *EthTxSigner) Sign(privateKey *ecdsa.PrivateKey) (sig []byte) {
 	return sig
 }
 
+// EncodeRPL encodes the signed transaction in RLP format for broadcasting.
 func (tx *EthTxSigner) EncodeRPL() (data []byte, err error) {
 	rplBuf := new(bytes.Buffer)
 	err = rlp.Encode(rplBuf, tx)
@@ -73,6 +80,8 @@ func (tx *EthTxSigner) EncodeRPL() (data []byte, err error) {
 	data = rplBuf.Bytes()
 	return data, nil
 }
+// Hash computes the EIP-155 transaction hash for signing.
+// Includes chain ID in the hash to prevent replay attacks.
 func (tx *EthTxSigner) Hash() []byte {
 	return rlpHash([]interface{}{
 		tx.Nonce,
@@ -84,6 +93,7 @@ func (tx *EthTxSigner) Hash() []byte {
 		tx.chainId, uint(0), uint(0),
 	})
 }
+// rlpHash computes Keccak-256 hash of RLP-encoded data.
 func rlpHash(x interface{}) []byte {
 	rplBuffer := new(bytes.Buffer)
 	err := rlp.Encode(rplBuffer, x)

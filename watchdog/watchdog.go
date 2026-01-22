@@ -1,3 +1,6 @@
+// Package watchdog provides blockchain monitoring services for detecting
+// transactions involving managed addresses. It polls the blockchain for new blocks
+// and mempool transactions, firing events when relevant addresses are involved.
 package watchdog
 
 import (
@@ -7,29 +10,36 @@ import (
 	"sync"
 )
 
+// ServiceOption is a function that configures a Service.
 type ServiceOption func(s *Service)
 
+// WithAddressManager sets the address manager for checking known addresses.
 func WithAddressManager(pool *address.Manager) ServiceOption {
 	return func(s *Service) {
 		s.addressPool = pool
 	}
 }
+// WithConfigStorage sets the storage backend for watchdog configuration.
 func WithConfigStorage(storage storage.BinStorage) ServiceOption {
 	return func(s *Service) {
 		s.config.storage = storage
 	}
 }
+// WithStateStorage sets the storage backend for watchdog state persistence.
 func WithStateStorage(storage storage.BinStorage) ServiceOption {
 	return func(s *Service) {
 		s.state.storage = storage
 	}
 }
+// WithClient sets the blockchain client for querying blocks and transactions.
 func WithClient(client types.ChainClient) ServiceOption {
 	return func(s *Service) {
 		s.client = client
 	}
 }
 
+// SetLastStateTo overrides the last processed block number on startup.
+// Useful for reprocessing historical blocks.
 func SetLastStateTo(newState int64) ServiceOption {
 	return func(s *Service) {
 		s.state.setToBlock = true
@@ -37,6 +47,7 @@ func SetLastStateTo(newState int64) ServiceOption {
 	}
 }
 
+// NewService creates a new watchdog service with the specified options.
 func NewService(options ...ServiceOption) *Service {
 	service := &Service{
 		config: &Config{
@@ -52,6 +63,9 @@ func NewService(options ...ServiceOption) *Service {
 	return service
 }
 
+// Service is the main watchdog service that monitors the blockchain.
+// It polls for new blocks and mempool content, detecting transactions
+// involving managed addresses and firing events for subscribers.
 type Service struct {
 	run                     bool
 	checkInterval           int
@@ -71,6 +85,9 @@ type Service struct {
 	quit             chan struct{}
 }
 
+// Run starts the watchdog service.
+// Validates configuration, loads state, and starts monitoring loops.
+// Returns an error if required dependencies are not configured.
 func (w *Service) Run() (err error) {
 	if w.client == nil {
 		return ErrChainClientNotSet

@@ -2,6 +2,7 @@ package uniclient
 
 import "encoding/json"
 
+// TransferAssetsResult contains the result of an asset transfer operation.
 type TransferAssetsResult struct {
 	TxID              string      `json:"tx_id"`
 	Success           bool        `json:"success"`
@@ -17,6 +18,7 @@ type TransferAssetsResult struct {
 	ChainSpecificData []byte      `json:"chainSpecificData,omitempty"`
 }
 
+// transferAssetsRequest is the request body for asset transfer operations.
 type transferAssetsRequest struct {
 	ServiceID      int         `json:"serviceId,omitempty"`
 	PrivateKey     string      `json:"privateKey,omitempty"`
@@ -29,6 +31,7 @@ type transferAssetsRequest struct {
 	AmountFormated bool        `json:"amountFormated,omitempty"`
 }
 
+// TransferAsset initiates an asset transfer from one address to another.
 func (c *Client) TransferAsset(addressFrom, addressTo string, amount json.Number, symbol string, formated bool) (transferResult *TransferAssetsResult, err error) {
 	request := NewRequest("transferAssets", &transferAssetsRequest{
 		From:           addressFrom,
@@ -45,6 +48,7 @@ func (c *Client) TransferAsset(addressFrom, addressTo string, amount json.Number
 	return transferResponse, nil
 }
 
+// TransferGetEstimatedFee estimates the fee for a transfer operation.
 func (c *Client) TransferGetEstimatedFee(addressFrom, addressTo string, amount json.Number, symbol string, formated bool) (estimatedFee json.Number, err error) {
 	request := NewRequest("transferGetEstimatedFee", &transferAssetsRequest{
 		From:           addressFrom,

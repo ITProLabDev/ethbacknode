@@ -7,13 +7,17 @@ import (
 	"strings"
 )
 
+// GetAddressCodec returns an Ethereum address codec instance.
 func GetAddressCodec() address.AddressCodec {
 	return &AddressCodec{}
 }
 
+// AddressCodec implements address.AddressCodec for Ethereum addresses.
+// Handles checksummed address encoding/decoding per EIP-55.
 type AddressCodec struct {
 }
 
+// EncodeBytesToAddress converts 20 bytes to a checksummed Ethereum address string.
 func (a *AddressCodec) EncodeBytesToAddress(addressBytes []byte) (string, error) {
 	if len(addressBytes) != 20 {
 		return "", address.ErrInvalidAddressBytes
@@ -22,6 +26,7 @@ func (a *AddressCodec) EncodeBytesToAddress(addressBytes []byte) (string, error)
 	return _addressCheckSum(addr), nil
 }
 
+// DecodeAddressToBytes converts an Ethereum address string to 20 bytes.
 func (a *AddressCodec) DecodeAddressToBytes(addressStr string) ([]byte, error) {
 	addressBytes, err := hexnum.ParseHexBytes(addressStr)
 	if err != nil {
@@ -31,6 +36,8 @@ func (a *AddressCodec) DecodeAddressToBytes(addressStr string) ([]byte, error) {
 
 }
 
+// PrivateKeyToAddress derives an Ethereum address from a private key.
+// Uses Keccak-256 hash of the public key, taking the last 20 bytes.
 func (a *AddressCodec) PrivateKeyToAddress(privateKey []byte) (address string, addressBytes []byte, err error) {
 	_, pub := crypto.ECDSAKeysFromPrivateKeyBytes(privateKey)
 	pubKeyBytes := crypto.ECDSAPublicKeyToBytes(pub)
@@ -39,11 +46,13 @@ func (a *AddressCodec) PrivateKeyToAddress(privateKey []byte) (address string, a
 	return address, addressBytes, nil
 }
 
+// IsValid checks if an address string is a valid Ethereum address.
 func (a *AddressCodec) IsValid(address string) bool {
 	_, err := a.DecodeAddressToBytes(address)
 	return err == nil
 }
 
+// _addressCheckSum applies EIP-55 mixed-case checksum encoding to an address.
 func _addressCheckSum(address string) string {
 	hex := strings.ToLower(address)[2:]
 	hash := crypto.Keccak256([]byte(hex))

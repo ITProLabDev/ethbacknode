@@ -7,16 +7,19 @@ import (
 	"net/http"
 )
 
+// Transport defines the interface for RPC communication.
 type Transport interface {
 	Call(request *Request, response interface{}) (err error)
 }
 
+// httpTransport implements Transport using HTTP POST requests.
 type httpTransport struct {
 	additionalHeaders map[string]string
 	httpUrl           string
 	http              *http.Client
 }
 
+// Call sends an HTTP POST request with JSON-encoded request body and decodes the response.
 func (c *httpTransport) Call(request *Request, response interface{}) (err error) {
 	requestBuffer := new(bytes.Buffer)
 	err = json.NewEncoder(requestBuffer).Encode(request)
@@ -40,6 +43,7 @@ func (c *httpTransport) Call(request *Request, response interface{}) (err error)
 	return err
 }
 
+// AddHeader adds a custom HTTP header to be sent with all requests.
 func (c *httpTransport) AddHeader(key, value string) {
 	if c.additionalHeaders == nil {
 		c.additionalHeaders = make(map[string]string)

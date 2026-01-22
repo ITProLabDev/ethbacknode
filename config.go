@@ -13,10 +13,14 @@ import (
 	"github.com/ITProLabDev/ethbacknode/tools/log"
 )
 
+// Error definitions for configuration operations.
 var (
+	// ErrConfigStorageEmpty is returned when attempting to save config without storage.
 	ErrConfigStorageEmpty = errors.New("config storage not set")
 )
 
+// Config holds the global application configuration.
+// It supports both HCL (primary) and JSON (legacy) formats.
 type Config struct {
 	storage           storage.BinStorage `json:"-"`
 	NodeUrl           string             `json:"nodeUrl" hcl:"nodeUrl,attr"`
@@ -35,6 +39,8 @@ type Config struct {
 	BurnAddress       string             `json:"burnAddress" hcl:"burnAddress,attr"`
 }
 
+// _configDefaultStorage creates and returns the default configuration storage.
+// It uses BinFileStorage with the global config path.
 func _configDefaultStorage() storage.BinStorage {
 	configStore, err := storage.NewBinFileStorage("Config", ".", ".", globalConfigPath)
 	if err != nil {
@@ -43,6 +49,10 @@ func _configDefaultStorage() storage.BinStorage {
 	return configStore
 }
 
+// Load reads and parses the configuration from storage.
+// It auto-detects the format (HCL or JSON) by examining the first character.
+// JSON files are supported for backward compatibility but will be converted
+// to HCL format on the next save operation.
 func (c *Config) Load() (err error) {
 	if !c.storage.IsExists() {
 		err = c.coldStart()
@@ -79,7 +89,8 @@ func (c *Config) Load() (err error) {
 	return
 }
 
-// trimWhitespace removes leading whitespace characters
+// trimWhitespace removes leading whitespace characters (space, tab, newline, carriage return)
+// from the beginning of a byte slice. Used for format detection.
 func trimWhitespace(data []byte) []byte {
 	for i, b := range data {
 		if b != ' ' && b != '\t' && b != '\n' && b != '\r' {
@@ -89,6 +100,9 @@ func trimWhitespace(data []byte) []byte {
 	return data
 }
 
+// Save persists the configuration to storage in HCL format.
+// It writes all configuration fields including optional maps (flags, params, headers).
+// Returns ErrConfigStorageEmpty if storage is not initialized.
 func (c *Config) Save() (err error) {
 	if c.storage == nil {
 		return ErrConfigStorageEmpty
@@ -144,6 +158,9 @@ func (c *Config) Save() (err error) {
 	return
 }
 
+// coldStart initializes the configuration with default values when no config file exists.
+// It sets up default connection parameters and saves the initial configuration.
+// Default settings: localhost:8545 (HTTP-RPC), localhost:21080 (endpoint).
 func (c *Config) coldStart() (err error) {
 	if c.storage == nil {
 		return ErrConfigStorageEmpty
@@ -161,6 +178,9 @@ func (c *Config) coldStart() (err error) {
 	return c.Save()
 }
 
+// Flag retrieves a boolean flag value from configuration by name.
+// If the flag doesn't exist, it initializes it to false and auto-saves the config.
+// This allows dynamic flag registration at runtime.
 func (c *Config) Flag(name string) bool {
 	var changed bool
 	defer func() {
@@ -186,6 +206,9 @@ func (c *Config) Flag(name string) bool {
 	}
 }
 
+// String retrieves a string parameter value from configuration by name.
+// If the parameter doesn't exist, it initializes it with defaultValue and auto-saves.
+// This allows dynamic parameter registration at runtime.
 func (c *Config) String(flagName string, defaultValue string) string {
 	var changed bool
 	defer func() {
@@ -211,6 +234,9 @@ func (c *Config) String(flagName string, defaultValue string) string {
 	}
 }
 
+// Int retrieves an integer parameter value from configuration by name.
+// If the parameter doesn't exist, it initializes it with defaultValue and auto-saves.
+// This allows dynamic parameter registration at runtime.
 func (c *Config) Int(flagName string, defaultValue int) int {
 	var changed bool
 	defer func() {

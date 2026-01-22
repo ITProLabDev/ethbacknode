@@ -11,6 +11,7 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
+// AddRpcProcessor registers an RPC processor, panicking if the method already exists.
 func (r *BackRpc) AddRpcProcessor(method RpcMethod, processor RpcProcessor) {
 	_, found := r.rpcProcessors[method]
 	if found {
@@ -20,6 +21,8 @@ func (r *BackRpc) AddRpcProcessor(method RpcMethod, processor RpcProcessor) {
 	r.rpcProcessors[method] = processor
 }
 
+// RouteRpcRequest routes incoming HTTP requests to the appropriate handler.
+// Supports /rpc for JSON-RPC, with placeholders for REST, WebSocket, and docs.
 func (r *BackRpc) RouteRpcRequest(ctx *fasthttp.RequestCtx) (err error) {
 	rpcRequestContext := NewRpcRequestContext()
 
@@ -55,6 +58,7 @@ func (r *BackRpc) RouteRpcRequest(ctx *fasthttp.RequestCtx) (err error) {
 	return errInternalRouteNotFound
 }
 
+// peekApiToken extracts the API token from the X-Api-Token header.
 func (r *BackRpc) peekApiToken(ctx *fasthttp.RequestCtx) (token string, err error) {
 	token = string(ctx.Request.Header.Peek("X-Api-Token"))
 	if token == "" {
@@ -63,6 +67,8 @@ func (r *BackRpc) peekApiToken(ctx *fasthttp.RequestCtx) (token string, err erro
 	return token, nil
 }
 
+// processRpcRequest parses and processes a JSON-RPC request.
+// Handles panics, validates the request, and dispatches to the appropriate processor.
 func (r *BackRpc) processRpcRequest(ctx *fasthttp.RequestCtx, rpcRequestContext *RpcRequestContext) (err error) {
 	rpcRequest := new(JsonRpcRequest)
 	rpcResponse := NewResponse()

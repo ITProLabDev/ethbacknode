@@ -6,6 +6,8 @@ import (
 	"github.com/ITProLabDev/ethbacknode/tools/log"
 )
 
+// Config holds the address pool configuration settings.
+// Controls address generation, pool sizes, and BIP-39/44 HD wallet settings.
 type Config struct {
 	storage                 storage.BinStorage
 	Debug                   bool `json:"debug"`
@@ -21,6 +23,7 @@ type Config struct {
 	Bip32DerivationPath     string `json:"bip32DerivationPath"`
 }
 
+// _configDefaultStorage returns the default file-based storage for configuration.
 func _configDefaultStorage() storage.BinStorage {
 	configStore, err := storage.NewBinFileStorage("Config", "data", "addresspool", "config.json")
 	if err != nil {
@@ -29,6 +32,8 @@ func _configDefaultStorage() storage.BinStorage {
 	return configStore
 }
 
+// Load reads the configuration from storage.
+// Performs cold start with defaults if no config exists.
 func (c *Config) Load() (err error) {
 	if !c.storage.IsExists() {
 		c.coldStart()
@@ -41,6 +46,7 @@ func (c *Config) Load() (err error) {
 	return c.checkDefaults()
 }
 
+// Save persists the configuration to storage as JSON.
 func (c *Config) Save() (err error) {
 	data, err := json.MarshalIndent(c, "", " ")
 	if err != nil {
@@ -50,6 +56,8 @@ func (c *Config) Save() (err error) {
 	return
 }
 
+// coldStart initializes the configuration with default values.
+// Called when no existing configuration is found.
 func (c *Config) coldStart() (err error) {
 	if c.storage == nil {
 		return ErrConfigStorageEmpty
@@ -73,6 +81,8 @@ func (c *Config) coldStart() (err error) {
 	return c.Save()
 }
 
+// checkDefaults validates and applies default values for missing configuration fields.
+// Saves the configuration if any defaults were applied.
 func (c *Config) checkDefaults() error {
 	changed := false
 	if c.Bip36MnemonicLen == 0 {

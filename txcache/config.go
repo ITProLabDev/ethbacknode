@@ -6,12 +6,15 @@ import (
 	"github.com/ITProLabDev/ethbacknode/tools/log"
 )
 
+// NewConfig creates a new configuration with default storage.
 func NewConfig() *Config {
 	return &Config{
 		storage: _configDefaultStorage(),
 	}
 }
 
+// Config holds the transaction cache configuration.
+// Controls confirmation thresholds and storage behavior.
 type Config struct {
 	storage               storage.BinStorage
 	Debug                 bool `json:"debug"`
@@ -21,6 +24,7 @@ type Config struct {
 	StoreOutgoingTx       bool `json:"storeOutgoingTx"`
 }
 
+// _configDefaultStorage returns the default file-based storage for configuration.
 func _configDefaultStorage() storage.BinStorage {
 	configStore, err := storage.NewBinFileStorage("Config", "data", "txcache", "config.json")
 	if err != nil {
@@ -29,6 +33,7 @@ func _configDefaultStorage() storage.BinStorage {
 	return configStore
 }
 
+// Load reads the configuration from storage.
 func (c *Config) Load() (err error) {
 	if !c.storage.IsExists() {
 		err = c.coldStart()
@@ -44,6 +49,7 @@ func (c *Config) Load() (err error) {
 	return
 }
 
+// Save persists the configuration to storage as JSON.
 func (c *Config) Save() (err error) {
 	data, err := json.MarshalIndent(c, "", " ")
 	if err != nil {
@@ -53,6 +59,8 @@ func (c *Config) Save() (err error) {
 	return
 }
 
+// coldStart initializes the configuration with default values.
+// Sets Confirmations=20 and RegisterConfirmations=50.
 func (c *Config) coldStart() (err error) {
 	if c.storage == nil {
 		return ErrConfigStorageEmpty

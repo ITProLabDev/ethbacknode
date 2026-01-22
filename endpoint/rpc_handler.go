@@ -14,11 +14,16 @@ import (
 	"github.com/valyala/fasthttp"
 )
 
+// Constants for HTTP content types and error messages.
 const (
-	MIME_TYPE_JSON           = "application/json"
+	// MIME_TYPE_JSON is the content type for JSON responses.
+	MIME_TYPE_JSON = "application/json"
+	// ERROR_METHOD_NOT_ALLOWED is the JSON-RPC error for unsupported methods.
 	ERROR_METHOD_NOT_ALLOWED = `{"error": {"code": -32601, "message": "method not found"}}`
 )
 
+// BackRpc is the main RPC handler that processes JSON-RPC 2.0 requests.
+// It manages address pools, blockchain clients, subscriptions, and security.
 type BackRpc struct {
 	debugMode        bool
 	addressPool      *address.Manager
@@ -35,8 +40,11 @@ type BackRpc struct {
 	burnAddress      string
 }
 
+// BackRpcOption is a function that configures a BackRpc handler.
 type BackRpcOption func(r *BackRpc)
 
+// NewBackRpc creates a new RPC handler with all required dependencies.
+// Initializes processors and loads known tokens from the blockchain client.
 func NewBackRpc(addressPool *address.Manager, chainClient types.ChainClient, subscriptions *subscriptions.Manager, watchdog *watchdog.Service, txCache types.TxCache, options ...BackRpcOption) *BackRpc {
 	r := &BackRpc{
 		addressPool:     addressPool,
@@ -60,6 +68,8 @@ func NewBackRpc(addressPool *address.Manager, chainClient types.ChainClient, sub
 	return r
 }
 
+// Handle is the main HTTP request handler implementing fasthttp.RequestHandler.
+// Routes requests to appropriate RPC processors.
 func (r *BackRpc) Handle(ctx *fasthttp.RequestCtx) {
 	if r.debugMode {
 		log.Debug("Handle rpc request:", string(ctx.Method()), string(ctx.Path()))
@@ -86,16 +96,20 @@ func (r *BackRpc) Handle(ctx *fasthttp.RequestCtx) {
 	}
 }
 
+// HttpResponse defines the interface for custom HTTP fallback responses.
 type HttpResponse interface {
 	ContentType() string
 	StatusCode() int
 	Body() string
 }
 
+// RegisterProcessor registers an RPC method processor without authentication.
 func (r *BackRpc) RegisterProcessor(method RpcMethod, processor RpcProcessor) {
 	r.rpcProcessors[method] = processor
 }
 
+// RegisterSecuredProcessor registers an RPC method processor with authentication.
+// Requires serviceId parameter and validates API token or signature.
 func (r *BackRpc) RegisterSecuredProcessor(method RpcMethod, processor RpcProcessor) {
 	r.rpcProcessors[method] = func(ctx RequestContext, request RpcRequest, response RpcResponse) {
 		serviceId, err := request.GetParamInt("serviceId")

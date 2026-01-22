@@ -2,6 +2,8 @@ package watchdog
 
 import "github.com/ITProLabDev/ethbacknode/tools/log"
 
+// processBlock retrieves a block by number and processes all its transactions.
+// Emits a block event and processes each transaction for managed addresses.
 func (w *Service) processBlock(blockNum int64) (err error) {
 	if w.config.Debug {
 		log.Debug("Process block", blockNum)

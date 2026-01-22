@@ -7,11 +7,13 @@ import (
 	"github.com/ITProLabDev/ethbacknode/tools/log"
 )
 
+// Config holds the subscription manager configuration.
 type Config struct {
 	storage storage.BinStorage
 	Debug   bool `json:"debug"`
 }
 
+// _configDefaultStorage returns the default file-based storage for configuration.
 func _configDefaultStorage() storage.BinStorage {
 	configStore, err := storage.NewBinFileStorage("Config", "data", "watchdog", "config.json")
 	if err != nil {
@@ -20,6 +22,7 @@ func _configDefaultStorage() storage.BinStorage {
 	return configStore
 }
 
+// Load reads the configuration from storage.
 func (c *Config) Load() (err error) {
 	if !c.storage.IsExists() {
 		err = c.coldStart()
@@ -35,6 +38,7 @@ func (c *Config) Load() (err error) {
 	return
 }
 
+// Save persists the configuration to storage as JSON.
 func (c *Config) Save() (err error) {
 	data, err := json.MarshalIndent(c, "", " ")
 	if err != nil {
@@ -44,6 +48,7 @@ func (c *Config) Save() (err error) {
 	return
 }
 
+// coldStart initializes the configuration with default values.
 func (c *Config) coldStart() (err error) {
 	if c.storage == nil {
 		return ErrConfigStorageEmpty

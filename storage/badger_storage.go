@@ -9,6 +9,12 @@ import (
 	"time"
 )
 
+// NewBadgerStorage creates a new Badger key-value database storage.
+// Parameters:
+//   - name: storage identifier for logging
+//   - globalDbPath: base data directory
+//   - dbPath: module-specific subdirectory
+//   - dbFile: database directory name
 func NewBadgerStorage(name, globalDbPath, dbPath, dbFile string) (s *BadgerStorage, err error) {
 	s = new(BadgerStorage)
 	s.Name = name
@@ -22,6 +28,8 @@ func NewBadgerStorage(name, globalDbPath, dbPath, dbFile string) (s *BadgerStora
 	return
 }
 
+// NewBadgerStorageReplicated creates a new Badger storage with replication support.
+// All writes are asynchronously replicated via the provided Replicator.
 func NewBadgerStorageReplicated(name, globalDbPath, dbPath, dbFile string, replicator Replicator) (s *BadgerStorageReplicated, err error) {
 	s = new(BadgerStorageReplicated)
 	s.Name = name
@@ -36,14 +44,18 @@ func NewBadgerStorageReplicated(name, globalDbPath, dbPath, dbFile string, repli
 	return
 }
 
+// BadgerStorage implements SimpleKeyStorage using Badger embedded database.
+// Provides high-performance key-value storage with ACID guarantees.
 type BadgerStorage struct {
-	Name         string     `json:"-"`
-	GlobalDbPath string     `json:"-"`
-	DataPath     string     `json:"-"`
-	DataBaseName string     `json:"-"`
-	db           *badger.DB `json:"-"`
+	Name         string     `json:"-"` // Storage identifier
+	GlobalDbPath string     `json:"-"` // Base data directory
+	DataPath     string     `json:"-"` // Module subdirectory
+	DataBaseName string     `json:"-"` // Database directory name
+	db           *badger.DB `json:"-"` // Badger DB instance
 }
 
+// connect opens the Badger database, creating directories as needed.
+// Retries up to 3 times on connection failure.
 func (s *BadgerStorage) connect() (err error) {
 	dbPath := path.Join(s.GlobalDbPath, s.DataPath)
 	if !s.isPathExists() {
@@ -74,6 +86,7 @@ func (s *BadgerStorage) connect() (err error) {
 	return
 }
 
+// isPathExists checks if the storage directory exists.
 func (s *BadgerStorage) isPathExists() bool {
 	if _, err := os.Stat(filepath.Join(s.GlobalDbPath, s.DataPath)); err != nil {
 		if os.IsNotExist(err) {
@@ -83,10 +96,13 @@ func (s *BadgerStorage) isPathExists() bool {
 	return true
 }
 
+// Do provides direct access to the underlying Badger database.
+// Use for advanced operations not covered by the interface.
 func (s *BadgerStorage) Do(processor func(db *badger.DB)) {
 	processor(s.db)
 }
 
+// Save persists data to the database using the data's key.
 func (s *BadgerStorage) Save(value Data) (err error) {
 	key := value.GetKey()
 	data := value.Encode()
@@ -99,6 +115,8 @@ func (s *BadgerStorage) Save(value Data) (err error) {
 	})
 }
 
+// Read retrieves data by key and populates the data parameter.
+// Returns badger.ErrKeyNotFound if the key doesn't exist.
 func (s *BadgerStorage) Read(key Key, data Data) (err error) {
 	keyBytes := key.GetKey()
 	return s.db.View(func(txn *badger.Txn) error {
@@ -114,6 +132,8 @@ func (s *BadgerStorage) Read(key Key, data Data) (err error) {
 	})
 }
 
+// ReadAll iterates over all records, calling processor for each value.
+// Uses prefetch for efficient bulk reads.
 func (s *BadgerStorage) ReadAll(processor func(raw []byte) (err error)) (err error) {
 	return s.db.View(func(txn *badger.Txn) error {
 		iteratorOptions := badger.DefaultIteratorOptions
@@ -133,6 +153,8 @@ func (s *BadgerStorage) ReadAll(processor func(raw []byte) (err error)) (err err
 	})
 }
 
+// ReadAllKey iterates over all records, calling processor with both key and value.
+// Uses prefetch for efficient bulk reads.
 func (s *BadgerStorage) ReadAllKey(processor func(key, raw []byte) (err error)) (err error) {
 	return s.db.View(func(txn *badger.Txn) error {
 		iteratorOptions := badger.DefaultIteratorOptions
@@ -153,6 +175,7 @@ func (s *BadgerStorage) ReadAllKey(processor func(key, raw []byte) (err error)) 
 	})
 }
 
+// Delete removes a record by key from the database.
 func (s *BadgerStorage) Delete(rowKey []byte) (err error) {
 	return s.db.Update(func(txn *badger.Txn) error {
 		err := txn.Delete(rowKey)
@@ -160,18 +183,22 @@ func (s *BadgerStorage) Delete(rowKey []byte) (err error) {
 	})
 }
 
-//todo create tests
-
+// Replicator defines an interface for asynchronous data replication.
 type Replicator interface {
+	// Update is called when data is saved.
 	Update(key []byte, data []byte)
+	// Delete is called when data is deleted.
 	Delete(key []byte)
 }
 
+// BadgerStorageReplicated extends BadgerStorage with replication support.
+// All write operations are asynchronously replicated to the configured Replicator.
 type BadgerStorageReplicated struct {
 	BadgerStorage
-	replicator Replicator
+	replicator Replicator // Replication handler
 }
 
+// Save persists data and asynchronously replicates the change.
 func (s *BadgerStorageReplicated) Save(value Data) (err error) {
 	key := value.GetKey()
 	data := value.Encode()
@@ -185,6 +212,7 @@ func (s *BadgerStorageReplicated) Save(value Data) (err error) {
 	})
 }
 
+// Delete removes a record and asynchronously replicates the deletion.
 func (s *BadgerStorageReplicated) Delete(rowKey []byte) (err error) {
 	go s.replicator.Delete(rowKey)
 	return s.db.Update(func(txn *badger.Txn) error {

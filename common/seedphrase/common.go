@@ -1,3 +1,5 @@
+// Package seedphrase provides mnemonic seed phrase generation and validation.
+// It implements conversion between byte arrays and BIP-39 mnemonic words.
 package seedphrase
 
 import (
@@ -24,10 +26,12 @@ func validateMnemonicWordCount(mnemonic []string) error {
 	}
 	return nil
 }
+// extractDataFromBitsArray extracts data bytes from a bit array, excluding checksum.
 func extractDataFromBitsArray(bitsArray []uint8) []byte {
 	dataBits, _ := shiftBitsFromBitArray(bitsArray, len(bitsArray)/32)
 	return bitArrayToBytes(dataBits)
 }
+// uint16ToBitArray converts a 16-bit integer to an array of bits.
 func uint16ToBitArray(index uint16) []uint8 {
 	indexBits := make([]uint8, 16)
 	for i := 0; i < 16; i++ {
@@ -73,6 +77,7 @@ func validateChecksumBits(dataBits []uint8) error {
 	}
 	return nil
 }
+// getSha256Hash computes the SHA-256 hash of the data.
 func getSha256Hash(data []byte) []byte {
 	hasher := sha256.New()
 	_, _ = hasher.Write(data)
@@ -91,6 +96,7 @@ func bytesToBitArray(data []byte) []uint8 {
 	return out
 }
 
+// bitArrayToBytes converts a bit array to a byte slice.
 func bitArrayToBytes(bitArray []uint8) []byte {
 	var out []byte
 	for i := 0; i < len(bitArray); i += 8 {
@@ -104,21 +110,26 @@ func bitArrayToBytes(bitArray []uint8) []byte {
 	return out
 }
 
+// addBitsToBitArray appends bits to the end of a bit array.
 func addBitsToBitArray(bitArray []uint8, bits []uint8) []uint8 {
 	return append(bitArray, bits...)
 }
 
+// pushBitsToBitArray prepends bits to the beginning of a bit array.
 func pushBitsToBitArray(bitArray []uint8, bits []uint8) []uint8 {
 	return append(bits, bitArray...)
 }
 
+// shiftBitsFromBitArray removes bits from the end of an array, returning both parts.
 func shiftBitsFromBitArray(bitArray []uint8, bitsCount int) ([]uint8, []uint8) {
 	return bitArray[:len(bitArray)-bitsCount], bitArray[len(bitArray)-bitsCount:]
 }
+// popBitsFromBitArray removes bits from the beginning of an array, returning both parts.
 func popBitsFromBitArray(bitArray []uint8, bitsCount int) ([]uint8, []uint8) {
 	return bitArray[0:bitsCount], bitArray[bitsCount:]
 }
 
+// padBitsArray left-pads a bit array with zeros to the specified length.
 func padBitsArray(bitsArray []uint8, length int) []uint8 {
 	offset := length - len(bitsArray)
 	if offset <= 0 {

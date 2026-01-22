@@ -6,6 +6,8 @@ import (
 	"github.com/ITProLabDev/ethbacknode/types"
 )
 
+// TransactionEvent handles a new transaction event from the watchdog.
+// Queues the event for processing in the event loop.
 func (s *Manager) TransactionEvent(transactionInfo *types.TransferInfo) {
 	s.eventPipe <- func() {
 		transactionInfoStatic := transactionInfo
@@ -13,6 +15,8 @@ func (s *Manager) TransactionEvent(transactionInfo *types.TransferInfo) {
 	}
 }
 
+// transactionEventProcess processes a transaction event.
+// Saves new transactions, updates existing ones, and triggers notifications.
 func (s *Manager) transactionEventProcess(transactionInfo *types.TransferInfo) {
 	var txInfo *TransferInfoRecord
 	var err error
@@ -66,6 +70,9 @@ func (s *Manager) transactionEventProcess(transactionInfo *types.TransferInfo) {
 	go s.transactionEventPostProcess(txNotification)
 }
 
+// transactionEventPostProcess sends notifications to affected subscribers.
+// Checks if sender/recipient addresses are managed and notifies accordingly.
+// Triggers fund gathering if enabled and transaction is confirmed.
 func (s *Manager) transactionEventPostProcess(transactionInfo *TransferNotification) {
 	s.notifyMux.Lock()
 	defer s.notifyMux.Unlock()
