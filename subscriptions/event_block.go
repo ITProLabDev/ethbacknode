@@ -2,6 +2,8 @@ package subscriptions
 
 import "github.com/ITProLabDev/ethbacknode/tools/log"
 
+// BlockEvent handles a new block event from the watchdog.
+// Queues the event for processing in the event loop.
 func (s *Manager) BlockEvent(blockNum int64, blockId string) {
 	s.eventPipe <- func() {
 		blockNumStatic := blockNum
@@ -9,6 +11,8 @@ func (s *Manager) BlockEvent(blockNum int64, blockId string) {
 		s.blockEvent(blockNumStatic, blockIdStatic)
 	}
 }
+// blockEvent processes a block event.
+// Notifies services, checks transaction confirmations, and updates statuses.
 func (s *Manager) blockEvent(blockNum int64, blockId string) {
 	go s.blockNotifyServices(blockNum, blockId)
 	minConfirmations := s.blockchainClient.MinConfirmations() - 1
@@ -61,6 +65,7 @@ func (s *Manager) blockEvent(blockNum int64, blockId string) {
 	}
 }
 
+// blockNotifyServices notifies all subscribers that have ReportNewBlock enabled.
 func (s *Manager) blockNotifyServices(blockNum int64, blockId string) {
 	blockNotification := &BlockNotification{
 		ChainId:  s.blockchainClient.GetChainId(),
@@ -74,6 +79,7 @@ func (s *Manager) blockNotifyServices(blockNum int64, blockId string) {
 	})
 }
 
+// BlockNotification is the payload sent to subscribers for block events.
 type BlockNotification struct {
 	ChainId  string
 	BlockNum int64

@@ -2,7 +2,9 @@ package endpoint
 
 import "fmt"
 
+// JSON-RPC 2.0 version and standard error codes.
 const (
+	// JSON_RPC_VERSION is the JSON-RPC protocol version.
 	JSON_RPC_VERSION = "2.0"
 
 	ERROR_CODE_PARSE_ERROR         = -32700
@@ -17,6 +19,8 @@ const (
 	ERROR_MESSAGE_UNAUTHORIZED     = "unauthorized access"
 )
 
+// RequestId represents a JSON-RPC request identifier.
+// Handles both string and numeric IDs in JSON.
 type RequestId string
 
 func (id RequestId) String() string {

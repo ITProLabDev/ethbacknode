@@ -1,3 +1,4 @@
+// Package crypto provides cryptographic operations for Ethereum transactions.
 package crypto
 
 import (
@@ -27,6 +28,7 @@ type KeccakState interface {
 	Read([]byte) (int, error)
 }
 
+// NewKeccakState creates a new Keccak-256 hash state.
 func NewKeccakState() KeccakState {
 	return sha3.NewLegacyKeccak256().(KeccakState)
 }

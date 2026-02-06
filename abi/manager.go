@@ -1,3 +1,5 @@
+// Package abi provides smart contract ABI encoding/decoding for ERC-20 tokens.
+// It manages known smart contracts and supports ERC-20 call data encoding.
 package abi
 
 import (
@@ -9,19 +11,23 @@ import (
 	"sync"
 )
 
+// Option is a function that configures a SmartContractsManager.
 type Option func(*SmartContractsManager)
 
+// WithStorage sets the storage backend for known contracts.
 func WithStorage(storage storage.BinStorage) Option {
 	return func(m *SmartContractsManager) {
 		m.storage = storage
 	}
 }
+// WithAddressCodec sets the address encoder/decoder for ABI encoding.
 func WithAddressCodec(codec address.AddressCodec) Option {
 	return func(m *SmartContractsManager) {
 		m.addressCodec = codec
 	}
 }
 
+// NewManager creates a new smart contracts manager with the specified options.
 func NewManager(options ...Option) *SmartContractsManager {
 	manager := &SmartContractsManager{
 		storage:   _smartContractsDefaultStorage(),
@@ -35,6 +41,8 @@ func NewManager(options ...Option) *SmartContractsManager {
 	return manager
 }
 
+// SmartContractsManager manages known smart contracts and provides ABI encoding.
+// Maintains lookup maps by symbol, name, and address for efficient queries.
 type SmartContractsManager struct {
 	mux          sync.RWMutex
 	storage      storage.BinStorage
@@ -77,6 +85,7 @@ func (m *SmartContractsManager) addUnsafe(c *SmartContractInfo) {
 	m.afterLoad()
 }
 
+// Init initializes the manager by loading ERC-20 ABI and known contracts.
 func (m *SmartContractsManager) Init() error {
 	if m.storage == nil {
 		return ErrConfigStorageEmpty
@@ -93,6 +102,7 @@ func (m *SmartContractsManager) Init() error {
 	}
 	return m.Load()
 }
+// Add adds a smart contract to the registry. Thread-safe.
 func (m *SmartContractsManager) Add(c *SmartContractInfo) {
 	m.mux.Lock()
 	m.addUnsafe(c)
@@ -100,6 +110,7 @@ func (m *SmartContractsManager) Add(c *SmartContractInfo) {
 	m.Save()
 }
 
+// Load reads the known contracts from storage.
 func (m *SmartContractsManager) Load() (err error) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
@@ -112,6 +123,7 @@ func (m *SmartContractsManager) Load() (err error) {
 	return
 }
 
+// Save persists the known contracts to storage.
 func (m *SmartContractsManager) Save() (err error) {
 	m.mux.RLock()
 	defer m.mux.RUnlock()
@@ -122,6 +134,7 @@ func (m *SmartContractsManager) Save() (err error) {
 	return m.storage.Save(data)
 }
 
+// ColdStart initializes the contracts list with built-in defaults.
 func (m *SmartContractsManager) ColdStart() (err error) {
 	if m.storage == nil {
 		return ErrConfigStorageEmpty
@@ -141,6 +154,7 @@ func (m *SmartContractsManager) ColdStart() (err error) {
 	return m.Save()
 }
 
+// Walk iterates over all known contracts with a read lock.
 func (m *SmartContractsManager) Walk(view func(c *SmartContractInfo)) {
 	m.mux.RLock()
 	for _, c := range m.contracts {
@@ -149,6 +163,7 @@ func (m *SmartContractsManager) Walk(view func(c *SmartContractInfo)) {
 	m.mux.RUnlock()
 }
 
+// GetSmartContractAddressByName finds a contract address by its name.
 func (m *SmartContractsManager) GetSmartContractAddressByName(contractName string) (contractAddress string, err error) {
 	m.Walk(func(c *SmartContractInfo) {
 		if c.Name == contractName {
@@ -161,6 +176,7 @@ func (m *SmartContractsManager) GetSmartContractAddressByName(contractName strin
 	return contractAddress, err
 }
 
+// GetSmartContractAddressByToken finds a contract address by its token symbol.
 func (m *SmartContractsManager) GetSmartContractAddressByToken(symbol string) (contractAddress string, err error) {
 	//symbol = strings.ToLower(symbol)
 	m.Walk(func(c *SmartContractInfo) {
@@ -175,6 +191,7 @@ func (m *SmartContractsManager) GetSmartContractAddressByToken(symbol string) (c
 	return contractAddress, err
 }
 
+// GetSmartContractByToken finds a contract by its token symbol.
 func (m *SmartContractsManager) GetSmartContractByToken(symbol string) (contract *SmartContractInfo, err error) {
 	symbol = strings.ToLower(symbol)
 	m.Walk(func(c *SmartContractInfo) {
@@ -188,6 +205,7 @@ func (m *SmartContractsManager) GetSmartContractByToken(symbol string) (contract
 	return contract, err
 }
 
+// GetSmartContractByAddress finds a contract by its address.
 func (m *SmartContractsManager) GetSmartContractByAddress(contractAddress string) (contract *SmartContractInfo, err error) {
 	var found bool
 	contractAddress = strings.ToLower(contractAddress)
@@ -197,6 +215,7 @@ func (m *SmartContractsManager) GetSmartContractByAddress(contractAddress string
 	return contract, nil
 }
 
+// GetSmartContractList returns a map of contract names to addresses.
 func (m *SmartContractsManager) GetSmartContractList() (list map[string]string) {
 	list = make(map[string]string)
 	for _, c := range m.contracts {

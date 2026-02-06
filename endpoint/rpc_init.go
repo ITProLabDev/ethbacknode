@@ -1,5 +1,7 @@
 package endpoint
 
+// InitProcessors registers all built-in RPC method processors.
+// Sets up processors for ping, info, address, balance, transfer, and service methods.
 func (r *BackRpc) InitProcessors() {
 	r.RegisterProcessor("ping", r.rpcProcessPing)
 	r.RegisterProcessor("info", r.rpcProcessNodeInfo)

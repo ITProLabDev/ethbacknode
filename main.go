@@ -1,3 +1,6 @@
+// Package main implements the EthBackNode application - an Ethereum blockchain
+// backend adapter that provides JSON-RPC 2.0 API for address management,
+// transaction monitoring, and cryptocurrency transfers.
 package main
 
 import (
@@ -20,22 +23,41 @@ import (
 	"github.com/ITProLabDev/ethbacknode/watchdog"
 )
 
+// Application version and identification constants.
 const (
+	// APP_VERSION is the current version of the application.
 	APP_VERSION = "0.1.3dev"
-	CHAIN_NAME  = "EVM"
-	APP_NAME    = "EthBackNode"
+	// CHAIN_NAME identifies the blockchain type (EVM-compatible).
+	CHAIN_NAME = "EVM"
+	// APP_NAME is the application name used for logging and identification.
+	APP_NAME = "EthBackNode"
 )
 
+// Global variables for application state and configuration.
 var (
-	globalConfigPath = "config.json"
-	config           = &Config{
+	// globalConfigPath is the path to the configuration file (default: config.hcl).
+	globalConfigPath = "config.hcl"
+	// config holds the global application configuration.
+	config = &Config{
 		storage: _configDefaultStorage(),
 	}
 
-	done  = make(chan bool)
+	// done is a channel used to signal application shutdown.
+	done = make(chan bool)
+	// osSig is a channel that receives OS signals for graceful shutdown.
 	osSig = make(chan os.Signal, 1)
 )
 
+// main is the application entry point. It initializes all subsystems in the following order:
+// 1. Storage manager - data persistence layer
+// 2. ABI manager - smart contract ABI registry
+// 3. Chain client - Ethereum node connection (HTTP-RPC or IPC)
+// 4. Address manager - address generation and pool management
+// 5. Watchdog service - blockchain monitoring
+// 6. Subscriptions manager - event notification system
+// 7. Transaction cache - transaction caching
+// 8. Security manager - API authentication
+// 9. RPC endpoint server - JSON-RPC 2.0 HTTP server
 func main() {
 	signal.Notify(osSig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	log.Info(APP_NAME, CHAIN_NAME, " Connection Adapter", APP_VERSION)
@@ -218,6 +240,10 @@ func main() {
 	log.Info("Application stopped")
 }
 
+// run is the main event loop that waits for shutdown signals.
+// It listens on two channels:
+// - done: internal shutdown signal (e.g., server error)
+// - osSig: OS signals (SIGHUP, SIGINT, SIGTERM, SIGQUIT)
 func run() {
 	for {
 		select {
@@ -231,9 +257,13 @@ func run() {
 	}
 }
 
+// init parses command-line flags before main() is called.
+// Supported flags:
+//   - config: path to configuration file (default: config.hcl)
+//   - help: display usage information
 func init() {
 	var help bool
-	flag.StringVar(&globalConfigPath, "config", "config.json", "Path to global config file")
+	flag.StringVar(&globalConfigPath, "config", "config.hcl", "Path to global config file")
 	flag.BoolVar(&help, "help", false, "Show help")
 	flag.Parse()
 	if help {

@@ -4,6 +4,7 @@ import (
 	"math/big"
 )
 
+// Erc20CallGetBalance encodes a balanceOf call for the given address.
 func (m *SmartContractsManager) Erc20CallGetBalance(address string) (callData string, err error) {
 	method, err := m.erc20abi.GetMethodByName("balanceOf")
 	if err != nil {
@@ -16,6 +17,7 @@ func (m *SmartContractsManager) Erc20CallGetBalance(address string) (callData st
 	return method.encodeInputs(addressBytes)
 }
 
+// Erc20IsTransfer checks if the call data is an ERC-20 transfer method.
 func (m *SmartContractsManager) Erc20IsTransfer(callData []byte) bool {
 	method, err := m.erc20abi.GetMethodByName("transfer")
 	if err != nil {
@@ -25,6 +27,7 @@ func (m *SmartContractsManager) Erc20IsTransfer(callData []byte) bool {
 	return method.checkSignature(callDataMethod)
 }
 
+// Erc20DecodeAmount decodes a uint256 amount from call data.
 func (m *SmartContractsManager) Erc20DecodeAmount(callData []byte) (amount *big.Int) {
 	param := paramInput{
 		Type: "uint256",
@@ -32,6 +35,8 @@ func (m *SmartContractsManager) Erc20DecodeAmount(callData []byte) (amount *big.
 	}
 	return param.GetBigInt()
 }
+// Erc20DecodeIfTransfer decodes a transfer method's recipient and amount.
+// Returns ErrNotTransferMethod if the call data is not a transfer.
 func (m *SmartContractsManager) Erc20DecodeIfTransfer(callData []byte) (address string, amount *big.Int, err error) {
 	method, err := m.erc20abi.GetMethodByName("transfer")
 	callDataMethod := _extractMethodId(callData)

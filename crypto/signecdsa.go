@@ -48,6 +48,7 @@ func SignEcdsaRfc6979(priv *ecdsa.PrivateKey, hash []byte, alg func() hash.Hash)
 	return v, r, s
 }
 
+// SignEcdsaRfc6979Bytes signs using RFC 6979 and returns 65-byte signature [R || S || V].
 func SignEcdsaRfc6979Bytes(privateKey *ecdsa.PrivateKey, hash []byte, alg func() hash.Hash) (sig []byte) {
 	v, r, s := SignEcdsaRfc6979(privateKey, hash, alg)
 	sig = make([]byte, 65)
@@ -57,6 +58,7 @@ func SignEcdsaRfc6979Bytes(privateKey *ecdsa.PrivateKey, hash []byte, alg func()
 	return
 }
 
+// padBytes left-pads a byte slice with zeros to the specified length.
 func padBytes(slice []byte, length int) []byte {
 	if len(slice) < length {
 		slice = append(make([]byte, length-len(slice)), slice...)

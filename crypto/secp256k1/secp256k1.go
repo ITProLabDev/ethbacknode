@@ -10,12 +10,15 @@ import (
 	"math/big"
 )
 
+// secp256k1 is the curve instance.
 var secp256k1 secp256k1Curve
 
+// secp256k1Curve wraps CurveParams to implement the secp256k1 elliptic curve.
 type secp256k1Curve struct {
 	*CurveParams
 }
 
+// initSecp256k1 initializes the secp256k1 curve parameters per SEC2 v2 section 2.4.1.
 func initSecp256k1() {
 	// See https://www.secg.org/sec2-v2.pdf, section 2.4.1
 	// curve equation y² = x³ + 7

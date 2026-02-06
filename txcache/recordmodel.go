@@ -5,6 +5,8 @@ import (
 	"math/big"
 )
 
+// TransferInfoCachedRecord is the persistent storage format for cached transactions.
+// Stored in BadgerHold with indexed fields for efficient queries.
 type TransferInfoCachedRecord struct {
 	TxID              string   `json:"txId" badgerhold:"key"`
 	Timestamp         int64    `json:"timestamp"`
@@ -27,6 +29,7 @@ type TransferInfoCachedRecord struct {
 	ChainSpecificData []byte   `json:"chainSpecificData,omitempty"`
 }
 
+// loadFromTransferInfo populates the record from a TransferInfo struct.
 func (r *TransferInfoCachedRecord) loadFromTransferInfo(info *types.TransferInfo) {
 	r.TxID = info.TxID
 	r.Timestamp = info.Timestamp
@@ -50,6 +53,7 @@ func (r *TransferInfoCachedRecord) loadFromTransferInfo(info *types.TransferInfo
 	r.Amount = new(big.Int).Set(info.Amount)
 }
 
+// getTransferInfo converts the record to a TransferInfo struct.
 func (r *TransferInfoCachedRecord) getTransferInfo() *types.TransferInfo {
 	return &types.TransferInfo{
 		TxID:              r.TxID,

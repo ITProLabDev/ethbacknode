@@ -1,3 +1,5 @@
+// Package log provides structured logging utilities for the application.
+// It wraps the go-logging library with convenient helper functions.
 package log
 
 import (
@@ -8,10 +10,12 @@ import (
 	"github.com/DeepForestTeam/go-logging"
 )
 
+// DEFAULT_DEBUG_LEVEL is the default logging verbosity level.
 const (
 	DEFAULT_DEBUG_LEVEL = 5
 )
 
+// Package-level logging state.
 var (
 	debugMode int
 	_loger    = logging.MustGetLogger("main")
@@ -20,6 +24,7 @@ var (
 	backend *logging.LogBackend
 )
 
+// GetLogger returns the underlying go-logging logger instance.
 func GetLogger() *logging.Logger {
 	return _loger
 }
@@ -39,6 +44,7 @@ func init() {
 	_loger.ExtraCalldepth = 1
 }
 
+// SetLevel changes the logging verbosity level (1-7).
 func SetLevel(l int) {
 	debugMode = l
 	backend = logging.NewLogBackend(os.Stderr, "", 0)
@@ -47,10 +53,12 @@ func SetLevel(l int) {
 	_loger.ExtraCalldepth = 1
 }
 
+// Println logs a debug message.
 func Println(v ...interface{}) {
 	_loger.Debug(v...)
 }
 
+// Dump logs values as formatted JSON with type information.
 func Dump(v ...interface{}) {
 	if len(v) == 1 {
 		val := v[0]
@@ -82,27 +90,35 @@ func Dump(v ...interface{}) {
 	}
 }
 
+// Debug logs a debug-level message.
 func Debug(v ...interface{}) {
 	_loger.Debug(v...)
 }
+// Info logs an info-level message.
 func Info(v ...interface{}) {
 	_loger.Info(v...)
 }
+// Fatal logs a fatal-level message and exits the application.
 func Fatal(v ...interface{}) {
 	_loger.Fatal(v...)
 }
+// Panic logs a message and panics.
 func Panic(v ...interface{}) {
 	_loger.Panic(v...)
 }
+// Critical logs a critical-level message.
 func Critical(v ...interface{}) {
 	_loger.Critical(v...)
 }
+// Error logs an error-level message.
 func Error(v ...interface{}) {
 	_loger.Error(v...)
 }
+// Warning logs a warning-level message.
 func Warning(v ...interface{}) {
 	_loger.Warning(v...)
 }
+// Notice logs a notice-level message.
 func Notice(v ...interface{}) {
 	_loger.Notice(v...)
 }
