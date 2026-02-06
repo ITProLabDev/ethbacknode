@@ -10,12 +10,22 @@ type RpcMethod string
 
 type RpcProcessor func(ctx RequestContext, request RpcRequest, response RpcResponse)
 
+type RpcAuth struct {
+	ClientID string `json:"clientId"`
+	TS       int64  `json:"ts,omitempty"`
+	Nonce    string `json:"nonce,omitempty"`
+	Alg      string `json:"alg,omitempty"`
+	Sig      string `json:"sig"`
+}
+
 type JsonRpcRequest struct {
 	Id        RequestId       `json:"id"`
 	JsonRpc   string          `json:"jsonrpc"`
 	Method    RpcMethod       `json:"method"`
 	Params    json.RawMessage `json:"params,omitempty"`
 	paramsMap map[string]interface{}
+
+	Auth *RpcAuth `json:"auth,omitempty"`
 }
 
 func (r *JsonRpcRequest) GetMethod() (method RpcMethod) {
