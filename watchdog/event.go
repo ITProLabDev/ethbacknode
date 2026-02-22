@@ -23,7 +23,8 @@ type event struct {
 func (w *Service) RegisterBlockEventListen(handler BlockEvent) {
 	w.blockEventHandlers = append(w.blockEventHandlers, handler)
 }
-// RegisterTransactionEventListen adds a handler for transaction events.
+
+// RegisterTransactionEventListen adds a handler to be called for transaction events.
 func (w *Service) RegisterTransactionEventListen(handler TransactionEvent) {
 	w.transactionHandlers = append(w.transactionHandlers, handler)
 }

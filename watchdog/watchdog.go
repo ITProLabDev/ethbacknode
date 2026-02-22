@@ -1,37 +1,44 @@
 // Package watchdog provides blockchain monitoring services for detecting
-// transactions involving managed addresses. It polls the blockchain for new blocks
-// and mempool transactions, firing events when relevant addresses are involved.
+// transactions involving managed addresses. It polls for new blocks and
+// mempool transactions, firing events when relevant addresses are involved.
+//
+// The service can resume from persisted state and supports overriding the
+// startup block height for reprocessing.
 package watchdog
 
 import (
+	"sync"
+
 	"github.com/ITProLabDev/ethbacknode/address"
 	"github.com/ITProLabDev/ethbacknode/storage"
 	"github.com/ITProLabDev/ethbacknode/types"
-	"sync"
 )
 
 // ServiceOption is a function that configures a Service.
 type ServiceOption func(s *Service)
 
-// WithAddressManager sets the address manager for checking known addresses.
+// WithAddressManager sets the address manager used to match known addresses.
 func WithAddressManager(pool *address.Manager) ServiceOption {
 	return func(s *Service) {
 		s.addressPool = pool
 	}
 }
+
 // WithConfigStorage sets the storage backend for watchdog configuration.
 func WithConfigStorage(storage storage.BinStorage) ServiceOption {
 	return func(s *Service) {
 		s.config.storage = storage
 	}
 }
+
 // WithStateStorage sets the storage backend for watchdog state persistence.
 func WithStateStorage(storage storage.BinStorage) ServiceOption {
 	return func(s *Service) {
 		s.state.storage = storage
 	}
 }
-// WithClient sets the blockchain client for querying blocks and transactions.
+
+// WithClient sets the blockchain client used to query blocks and mempool data.
 func WithClient(client types.ChainClient) ServiceOption {
 	return func(s *Service) {
 		s.client = client
