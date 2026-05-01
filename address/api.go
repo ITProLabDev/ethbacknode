@@ -52,26 +52,48 @@ func (p *Manager) GetFreeAddressAndSubscribe(serviceId int, userId, invoiceId in
 }
 
 // AddAddressRecordsBulk adds multiple address records in bulk.
-// Skips addresses that already exist.
+// Records already present in memory or on disk are skipped — never overwritten.
+// The whole batch runs under a single write lock to avoid TOCTOU between the
+// existence check and the insert.
 func (p *Manager) AddAddressRecordsBulk(addresses []*Address) (err error) {
-	for _, address := range addresses {
-		if !p.IsAddressKnown(address.Address) {
-			p.mux.Lock()
-			err = p.addAddressUnsafe(address)
-			p.mux.Unlock()
-			if err != nil {
-				//todo add address info to error
-				return err
-			}
-		}
+	if len(addresses) == 0 {
+		return nil
 	}
 	p.mux.Lock()
+	defer p.mux.Unlock()
 	for _, address := range addresses {
-		p.allAddresses[address.Address] = address
+		if address == nil || address.Address == "" {
+			continue
+		}
+		if _, exists := p.allAddresses[address.Address]; exists {
+			continue
+		}
+		if p.isAddressInDBUnsafe(address) {
+			// Present on disk but not in memory: do not overwrite. Load via
+			// preLoadAddresses on next start, or call updatePool to refresh.
+			continue
+		}
+		if err = p.addAddressUnsafe(address); err != nil {
+			return err
+		}
 	}
-	go p.updatePool()
-	p.mux.Unlock()
 	return nil
+}
+
+// isAddressInDBUnsafe reports whether a record for the given address exists
+// in persistent storage. Returns false on any storage error (including
+// not-found) to keep the call site simple — Save will surface real disk
+// failures on the subsequent write.
+// UNSAFE: caller must hold the mutex.
+func (p *Manager) isAddressInDBUnsafe(a *Address) bool {
+	if p.db == nil || len(a.AddressBytes) == 0 {
+		return false
+	}
+	var existing Address
+	if err := p.db.Read(a, &existing); err != nil {
+		return false
+	}
+	return existing.Address != ""
 }
 
 // AddAddressRecord adds a single address record to the pool.

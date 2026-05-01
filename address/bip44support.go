@@ -39,14 +39,11 @@ func (p *Manager) GenerateBit44AddressWithLen(mnemonicLen int) (addressRecord *A
 }
 
 // RecoverBit44Address recovers a BIP-44 HD wallet address from an existing mnemonic phrase.
-// Returns the address derived from the mnemonic.
+// Returns the address derived from the mnemonic, or an error if the mnemonic
+// is invalid (wrong length, unknown word, or bad BIP-39 checksum).
 func (p *Manager) RecoverBit44Address(mnemonic []string) (addressRecord *Address, err error) {
-
-	var bip44CoinType = bip44.CoinType(p.config.Bip44CoinType)
-
-	addressRecord, err = recoverBIP44AddressFromMnemonic(mnemonic, bip44CoinType, p.addressCodec)
-
-	return addressRecord, nil
+	bip44CoinType := bip44.CoinType(p.config.Bip44CoinType)
+	return recoverBIP44AddressFromMnemonic(mnemonic, bip44CoinType, p.addressCodec)
 }
 
 // bip44EntropyToAddressRecord derives a BIP-44 address from entropy bytes.
@@ -59,6 +56,9 @@ func bip44EntropyToAddressRecord(entropy []byte, coinType uint32, addressCodec A
 	mnemonic := strings.Split(mnemonicStr, " ")
 	seed := bip39.NewSeed(mnemonicStr, "")
 	masterKey, err := bip32.NewMasterKey(seed)
+	if err != nil {
+		return nil, err
+	}
 	key, err := bip44.NewKeyFromMasterKey(masterKey, coinType, 0x80000000, 0, 0)
 	if err != nil {
 		return nil, err
