@@ -63,9 +63,13 @@ func _smartContractsDefaultStorage() storage.BinStorage {
 }
 
 func (m *SmartContractsManager) afterLoad() {
+	m.byName = make(map[string]*SmartContractInfo, len(m.contracts))
+	m.byAddress = make(map[string]*SmartContractInfo, len(m.contracts))
+	m.bySymbol = make(map[string]*SmartContractInfo, len(m.contracts))
 	for _, c := range m.contracts {
 		m.byName[c.Name] = c
 		m.byAddress[strings.ToLower(c.ContractAddress)] = c
+		m.bySymbol[c.Symbol] = c
 	}
 }
 
@@ -114,13 +118,20 @@ func (m *SmartContractsManager) Add(c *SmartContractInfo) {
 func (m *SmartContractsManager) Load() (err error) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
+	if m.storage == nil {
+		return ErrConfigStorageEmpty
+	}
 	jsonBytes, err := m.storage.Load()
 	if err != nil {
 		return
 	}
-	err = json.Unmarshal(jsonBytes, &m.contracts)
+	var loaded []*SmartContractInfo
+	if err = json.Unmarshal(jsonBytes, &loaded); err != nil {
+		return err
+	}
+	m.contracts = loaded
 	m.afterLoad()
-	return
+	return nil
 }
 
 // Save persists the known contracts to storage.
@@ -144,13 +155,12 @@ func (m *SmartContractsManager) ColdStart() (err error) {
 	if err != nil {
 		return err
 	}
+	m.mux.Lock()
 	for _, c := range contracts {
 		m.addUnsafe(c)
 	}
-	if err != nil {
-		return err
-	}
 	m.afterLoad()
+	m.mux.Unlock()
 	return m.Save()
 }
 
@@ -193,7 +203,6 @@ func (m *SmartContractsManager) GetSmartContractAddressByToken(symbol string) (c
 
 // GetSmartContractByToken finds a contract by its token symbol.
 func (m *SmartContractsManager) GetSmartContractByToken(symbol string) (contract *SmartContractInfo, err error) {
-	symbol = strings.ToLower(symbol)
 	m.Walk(func(c *SmartContractInfo) {
 		if c.Symbol == symbol {
 			contract = c
@@ -207,9 +216,11 @@ func (m *SmartContractsManager) GetSmartContractByToken(symbol string) (contract
 
 // GetSmartContractByAddress finds a contract by its address.
 func (m *SmartContractsManager) GetSmartContractByAddress(contractAddress string) (contract *SmartContractInfo, err error) {
-	var found bool
 	contractAddress = strings.ToLower(contractAddress)
-	if contract, found = m.byAddress[contractAddress]; !found {
+	m.mux.RLock()
+	contract, found := m.byAddress[contractAddress]
+	m.mux.RUnlock()
+	if !found {
 		return nil, ErrUnknownContract
 	}
 	return contract, nil
@@ -217,7 +228,9 @@ func (m *SmartContractsManager) GetSmartContractByAddress(contractAddress string
 
 // GetSmartContractList returns a map of contract names to addresses.
 func (m *SmartContractsManager) GetSmartContractList() (list map[string]string) {
-	list = make(map[string]string)
+	m.mux.RLock()
+	defer m.mux.RUnlock()
+	list = make(map[string]string, len(m.contracts))
 	for _, c := range m.contracts {
 		list[c.Name] = c.ContractAddress
 	}

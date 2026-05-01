@@ -21,8 +21,14 @@ func _int64ToByte(i int64) []byte {
 
 func bytePad(src []byte, bytesLen int, padByte byte) []byte {
 	dst := make([]byte, bytesLen)
-	for i, _ := range dst {
-		dst[i] = padByte
+	if padByte != 0 {
+		for i := range dst {
+			dst[i] = padByte
+		}
+	}
+	if len(src) >= bytesLen {
+		copy(dst, src[len(src)-bytesLen:])
+		return dst
 	}
 	copy(dst[bytesLen-len(src):], src)
 	return dst

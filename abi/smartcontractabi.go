@@ -7,6 +7,7 @@ import (
 	"github.com/ITProLabDev/ethbacknode/tools/log"
 	"math/big"
 	"strings"
+	"sync"
 )
 
 const (
@@ -24,8 +25,8 @@ type SmartContractInfo struct {
 }
 
 type SmartContractAbi struct {
-	prepared bool
-	Entries  []*SmartContractAbiEntry `json:"entries"`
+	prepareOnce sync.Once
+	Entries     []*SmartContractAbiEntry `json:"entries"`
 }
 
 func (a *SmartContractAbi) AddEntry(entry *SmartContractAbiEntry) {
@@ -59,19 +60,21 @@ type SmartContractAbiEntryOutput struct {
 }
 
 func (e *SmartContractAbiEntry) DecodeInputs(data []byte) (paramsParsed []*paramInput, err error) {
+	if len(data) < 4 {
+		return nil, ErrInvalidParamsData
+	}
 	//skip method signature
 	data = data[4:]
 	paramsParsed = make([]*paramInput, len(e.Inputs))
 	for i, param := range e.Inputs {
-		if len(data) == 0 {
-			log.Error("invalid params Data")
-			return nil, ErrInvalidParamsData
-		}
 		nextParamParsed := &paramInput{
 			Name: param.Name,
 			Type: param.Type,
 		}
-		next := _parseParam(nextParamParsed, param.Type, data)
+		next, perr := _parseParam(nextParamParsed, param.Type, data)
+		if perr != nil {
+			return nil, perr
+		}
 		paramsParsed[i] = nextParamParsed
 		if len(data) >= next {
 			data = data[next:]
@@ -180,24 +183,22 @@ func (e *SmartContractAbiEntry) updateSignature() {
 }
 
 func (a *SmartContractAbi) _prepare() {
-	for _, e := range a.Entries {
-		e.updateSignature()
-	}
+	a.prepareOnce.Do(func() {
+		for _, e := range a.Entries {
+			e.updateSignature()
+		}
+	})
 }
 
 func (a *SmartContractAbi) dumpMethods() {
-	if !a.prepared {
-		a._prepare()
-	}
+	a._prepare()
 	for i, m := range a.Entries {
 		log.Debug(i, ":", m)
 	}
 }
 
 func (a *SmartContractAbi) GetMethodById(signature [4]byte) (entry *SmartContractAbiEntry, err error) {
-	if !a.prepared {
-		a._prepare()
-	}
+	a._prepare()
 	for _, entry = range a.Entries {
 		if entry.checkSignature(signature) {
 			return entry, nil
@@ -207,9 +208,7 @@ func (a *SmartContractAbi) GetMethodById(signature [4]byte) (entry *SmartContrac
 }
 
 func (a *SmartContractAbi) GetMethodByName(name string) (entry *SmartContractAbiEntry, err error) {
-	if !a.prepared {
-		a._prepare()
-	}
+	a._prepare()
 	for _, entry = range a.Entries {
 		if entry.Name == name {
 			return entry, nil
@@ -236,10 +235,10 @@ func (p *paramInput) GetInt64() (num int64) {
 }
 
 func (p *paramInput) GetBool() bool {
-	if p.Data[0] == 0 {
+	if len(p.Data) == 0 {
 		return false
 	}
-	return true
+	return p.Data[len(p.Data)-1] != 0
 }
 
 func (p *paramInput) SetAddress(addrBytes []byte) (err error) {
@@ -257,35 +256,43 @@ func (p *paramInput) SetBigInt(amount *big.Int) {
 	p.Data = bytePad(amount.Bytes(), 32, 0)
 }
 func (p *paramInput) SetBool(val bool) {
+	p.Data = make([]byte, 32)
 	if val {
-		p.Data[0] = 1
+		p.Data[31] = 1
 	}
 }
 
-func _parseParam(param *paramInput, paramType string, data []byte) (nextParam int) {
+func _parseParam(param *paramInput, paramType string, data []byte) (nextParam int, err error) {
 	switch paramType {
-	case "uint256":
+	case "uint256", "int256":
+		if len(data) < 32 {
+			return 0, ErrInvalidParamsData
+		}
 		param.Data = make([]byte, 32)
 		copy(param.Data, data[0:32])
-		return 32
-	case "int256":
-		param.Data = make([]byte, 32)
-		copy(param.Data, data[0:32])
-		return 32
+		return 32, nil
 	case "address":
+		if len(data) < 32 {
+			return 0, ErrInvalidParamsData
+		}
 		param.Data = make([]byte, 20)
 		copy(param.Data, data[12:32])
-		return 32
+		return 32, nil
 	case "bool":
+		if len(data) < 32 {
+			return 0, ErrInvalidParamsData
+		}
 		param.Data = make([]byte, 1)
 		copy(param.Data, data[31:32])
-		return 32
+		return 32, nil
 	}
-	return
+	return 0, ErrInvalidParamsData
 }
 
-func _extractMethodId(data []byte) [4]byte {
-	var signature [4]byte
+func _extractMethodId(data []byte) (signature [4]byte, ok bool) {
+	if len(data) < 4 {
+		return signature, false
+	}
 	copy(signature[:], data[:4])
-	return signature
+	return signature, true
 }

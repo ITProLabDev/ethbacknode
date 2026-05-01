@@ -6,6 +6,12 @@ import (
 
 // Erc20CallGetBalance encodes a balanceOf call for the given address.
 func (m *SmartContractsManager) Erc20CallGetBalance(address string) (callData string, err error) {
+	if m.erc20abi == nil {
+		return "", ErrSmartContractUnknownMethod
+	}
+	if m.addressCodec == nil {
+		return "", ErrInvalidParamsData
+	}
 	method, err := m.erc20abi.GetMethodByName("balanceOf")
 	if err != nil {
 		return "", err
@@ -19,11 +25,17 @@ func (m *SmartContractsManager) Erc20CallGetBalance(address string) (callData st
 
 // Erc20IsTransfer checks if the call data is an ERC-20 transfer method.
 func (m *SmartContractsManager) Erc20IsTransfer(callData []byte) bool {
+	if m.erc20abi == nil {
+		return false
+	}
 	method, err := m.erc20abi.GetMethodByName("transfer")
 	if err != nil {
 		return false
 	}
-	callDataMethod := _extractMethodId(callData)
+	callDataMethod, ok := _extractMethodId(callData)
+	if !ok {
+		return false
+	}
 	return method.checkSignature(callDataMethod)
 }
 
@@ -35,30 +47,42 @@ func (m *SmartContractsManager) Erc20DecodeAmount(callData []byte) (amount *big.
 	}
 	return param.GetBigInt()
 }
+
 // Erc20DecodeIfTransfer decodes a transfer method's recipient and amount.
 // Returns ErrNotTransferMethod if the call data is not a transfer.
 func (m *SmartContractsManager) Erc20DecodeIfTransfer(callData []byte) (address string, amount *big.Int, err error) {
+	if m.erc20abi == nil {
+		return "", nil, ErrSmartContractUnknownMethod
+	}
 	method, err := m.erc20abi.GetMethodByName("transfer")
-	callDataMethod := _extractMethodId(callData)
-	if method.checkSignature(callDataMethod) {
-		params, err := method.DecodeInputs(callData)
-		if err != nil {
-			return "", nil, err
-		}
-		for _, param := range params {
-			switch param.Type {
-			case "address":
-				address, err = m.addressCodec.EncodeBytesToAddress(param.GetAddressBytes())
-			case "uint256":
-				amount = param.GetBigInt()
-			default:
-				return "", nil, ErrInvalidParamsData
-			}
-		}
-		return address, amount, nil
-	} else {
+	if err != nil {
+		return "", nil, err
+	}
+	callDataMethod, ok := _extractMethodId(callData)
+	if !ok {
 		return "", nil, ErrNotTransferMethod
 	}
+	if !method.checkSignature(callDataMethod) {
+		return "", nil, ErrNotTransferMethod
+	}
+	params, err := method.DecodeInputs(callData)
+	if err != nil {
+		return "", nil, err
+	}
+	for _, param := range params {
+		switch param.Type {
+		case "address":
+			address, err = m.addressCodec.EncodeBytesToAddress(param.GetAddressBytes())
+			if err != nil {
+				return "", nil, err
+			}
+		case "uint256":
+			amount = param.GetBigInt()
+		default:
+			return "", nil, ErrInvalidParamsData
+		}
+	}
+	return address, amount, nil
 }
 
 /*
