@@ -1,0 +1,124 @@
+package abi
+
+import (
+	"bytes"
+	"encoding/hex"
+	"math/big"
+	"strings"
+	"testing"
+)
+
+func hexToBytes(t *testing.T, s string) []byte {
+	t.Helper()
+	b, err := hex.DecodeString(strings.ReplaceAll(s, " ", ""))
+	if err != nil {
+		t.Fatalf("bad hex: %v", err)
+	}
+	return b
+}
+
+func TestEncodeParams_Baz_Static(t *testing.T) {
+	// baz(uint32,bool) with (69,true)
+	types := []abiType{{kind: kindUint, size: 32}, {kind: kindBool}}
+	out, err := encodeParams(types, []any{big.NewInt(69), true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := hexToBytes(t,
+		"0000000000000000000000000000000000000000000000000000000000000045"+
+			"0000000000000000000000000000000000000000000000000000000000000001")
+	if !bytes.Equal(out, want) {
+		t.Fatalf("got  %x\nwant %x", out, want)
+	}
+}
+
+func TestDecodeParams_Baz_Static(t *testing.T) {
+	types := []abiType{{kind: kindUint, size: 32}, {kind: kindBool}}
+	data := hexToBytes(t,
+		"0000000000000000000000000000000000000000000000000000000000000045"+
+			"0000000000000000000000000000000000000000000000000000000000000001")
+	vals, err := decodeParams(types, data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(vals) != 2 {
+		t.Fatalf("got %d values", len(vals))
+	}
+	if vals[0].Value.(*big.Int).Int64() != 69 {
+		t.Fatalf("v0=%v", vals[0].Value)
+	}
+	if vals[1].Value.(bool) != true {
+		t.Fatalf("v1=%v", vals[1].Value)
+	}
+}
+
+func TestEncodeDecode_IntNegative_RoundTrip(t *testing.T) {
+	types := []abiType{{kind: kindInt, size: 256}}
+	for _, n := range []int64{-1, -255, -1 << 40, 0, 1, 1 << 40} {
+		out, err := encodeParams(types, []any{big.NewInt(n)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		vals, err := decodeParams(types, out)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if vals[0].Value.(*big.Int).Int64() != n {
+			t.Fatalf("n=%d round-tripped to %v", n, vals[0].Value)
+		}
+	}
+}
+
+func TestEncodeDecode_AddressAndFixedBytes(t *testing.T) {
+	addr := hexToBytes(t, "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef")
+	b4 := hexToBytes(t, "01020304")
+	types := []abiType{{kind: kindAddress}, {kind: kindFixedBytes, size: 4}}
+	out, err := encodeParams(types, []any{addr, b4})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// address right-aligned in slot 0; bytes4 left-aligned in slot 1
+	if !bytes.Equal(out[12:32], addr) {
+		t.Fatalf("address slot: %x", out[0:32])
+	}
+	if !bytes.Equal(out[32:36], b4) {
+		t.Fatalf("bytes4 slot: %x", out[32:64])
+	}
+	vals, err := decodeParams(types, out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(vals[0].Value.([]byte), addr) {
+		t.Fatalf("decoded addr %x", vals[0].Value)
+	}
+	if !bytes.Equal(vals[1].Value.([]byte), b4) {
+		t.Fatalf("decoded bytes4 %x", vals[1].Value)
+	}
+}
+
+func TestEncodeValue_RejectsNegativeUint(t *testing.T) {
+	_, err := encodeParams([]abiType{{kind: kindUint, size: 256}}, []any{big.NewInt(-1)})
+	if err == nil {
+		t.Fatal("negative uint must be rejected")
+	}
+}
+
+func TestEncodeValue_RejectsBadAddressLength(t *testing.T) {
+	for _, n := range []int{19, 21, 32} {
+		if _, err := encodeParams([]abiType{{kind: kindAddress}}, []any{make([]byte, n)}); err == nil {
+			t.Fatalf("address of %d bytes must be rejected (want exactly 20)", n)
+		}
+	}
+}
+
+func TestDecodeParams_RejectsHugeOffset(t *testing.T) {
+	// A dynamic param whose 32-byte offset slot is enormous must be rejected,
+	// not truncated by Int64() into a valid-looking index.
+	block := make([]byte, 32)
+	for i := range block {
+		block[i] = 0xff
+	}
+	if _, err := decodeParams([]abiType{{kind: kindBytes}}, block); err == nil {
+		t.Fatal("huge offset must be rejected")
+	}
+}
