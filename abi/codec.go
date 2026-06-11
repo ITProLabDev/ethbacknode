@@ -108,6 +108,19 @@ func encodeValue(t abiType, v any) ([]byte, error) {
 		out := make([]byte, 32)
 		copy(out, b) // left-aligned
 		return out, nil
+	case kindBytes:
+		b, ok := v.([]byte)
+		if !ok {
+			return nil, fmt.Errorf("%w: bytes expected", ErrInvalidParamsData)
+		}
+		return append(leftPad32(big.NewInt(int64(len(b))).Bytes()), rightPad(b)...), nil
+	case kindString:
+		s, ok := v.(string)
+		if !ok {
+			return nil, fmt.Errorf("%w: string expected", ErrInvalidParamsData)
+		}
+		b := []byte(s)
+		return append(leftPad32(big.NewInt(int64(len(b))).Bytes()), rightPad(b)...), nil
 	}
 	return nil, fmt.Errorf("%w: unsupported type %q", ErrInvalidParamsData, t.canonical())
 }
@@ -217,6 +230,26 @@ func decodeValue(t abiType, block []byte, at int) (DecodedValue, error) {
 		b := make([]byte, t.size)
 		copy(b, block[at:at+t.size])
 		dv.Value = b
+		return dv, nil
+	case kindBytes, kindString:
+		if at+32 > len(block) {
+			return dv, ErrInvalidParamsData
+		}
+		nBig := new(big.Int).SetBytes(block[at : at+32])
+		if !nBig.IsInt64() {
+			return dv, ErrInvalidParamsData
+		}
+		n := int(nBig.Int64())
+		if n < 0 || n > len(block)-(at+32) {
+			return dv, ErrInvalidParamsData
+		}
+		raw := make([]byte, n)
+		copy(raw, block[at+32:at+32+n])
+		if t.kind == kindString {
+			dv.Value = string(raw)
+		} else {
+			dv.Value = raw
+		}
 		return dv, nil
 	}
 	return dv, fmt.Errorf("%w: unsupported type %q", ErrInvalidParamsData, t.canonical())

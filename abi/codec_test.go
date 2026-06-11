@@ -122,3 +122,65 @@ func TestDecodeParams_RejectsHugeOffset(t *testing.T) {
 		t.Fatal("huge offset must be rejected")
 	}
 }
+
+func TestEncodeDecode_BytesAndString(t *testing.T) {
+	types := []abiType{{kind: kindString}, {kind: kindBytes}}
+	out, err := encodeParams(types, []any{"dave", []byte("dave")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	vals, err := decodeParams(types, out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if vals[0].Value.(string) != "dave" {
+		t.Fatalf("string=%q", vals[0].Value)
+	}
+	if string(vals[1].Value.([]byte)) != "dave" {
+		t.Fatalf("bytes=%q", vals[1].Value)
+	}
+}
+
+func TestEncodeValue_BytesLayout(t *testing.T) {
+	// "dave" → len 4 slot, then 64 61 76 65 left-aligned in a 32-byte slot.
+	enc, err := encodeValue(abiType{kind: kindBytes}, []byte("dave"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := hexToBytes(t,
+		"0000000000000000000000000000000000000000000000000000000000000004"+
+			"6461766500000000000000000000000000000000000000000000000000000000")
+	if !bytes.Equal(enc, want) {
+		t.Fatalf("got %x", enc)
+	}
+}
+
+func TestDecodeValue_RejectsHugeBytesLength(t *testing.T) {
+	// A bytes value whose 32-byte length slot is enormous must be rejected,
+	// not truncated by Int64() into a value that overflows the bounds check.
+	block := make([]byte, 64)
+	for i := 0; i < 32; i++ {
+		block[i] = 0xff // length slot = 2^256-1
+	}
+	if _, err := decodeValue(abiType{kind: kindBytes}, block, 0); err == nil {
+		t.Fatal("huge bytes length must be rejected")
+	}
+	// Also a length that fits int64 but exceeds the available data must fail.
+	block2 := make([]byte, 64)
+	block2[31] = 0xff // length = 255, but only 32 data bytes follow
+	if _, err := decodeValue(abiType{kind: kindBytes}, block2, 0); err == nil {
+		t.Fatal("length exceeding available data must be rejected")
+	}
+	// Low 64 bits = 0x7fffffffffffffff (huge positive), high bits set too.
+	block3 := make([]byte, 64)
+	for i := 0; i < 24; i++ {
+		block3[i] = 0xff
+	}
+	block3[24] = 0x7f
+	for i := 25; i < 32; i++ {
+		block3[i] = 0xff
+	}
+	if _, err := decodeValue(abiType{kind: kindBytes}, block3, 0); err == nil {
+		t.Fatal("huge positive bytes length must be rejected")
+	}
+}
