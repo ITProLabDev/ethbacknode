@@ -5,6 +5,7 @@ package urpc
 import (
 	"errors"
 	"net/http"
+	"time"
 )
 
 // Transport mode constants.
@@ -51,6 +52,19 @@ func WithRpcIPCSocket(socketPath string) ClientOption {
 		client.rpcClient = &ipcClient{
 			socketPath: socketPath,
 		}
+	}
+}
+
+// WithRpcIPCSocketPool sets the RPC client to use a pool of up to size IPC
+// connections, allowing independent calls to run in parallel instead of being
+// serialized on a single socket. A size <= 0 behaves like a single connection.
+// timeout bounds each call's read/write (0 = no deadline).
+//
+// Please note, may not work on Windows (differences between Unix sockets and
+// Windows named pipes).
+func WithRpcIPCSocketPool(socketPath string, size int, timeout time.Duration) ClientOption {
+	return func(client *Client) {
+		client.rpcClient = newIPCPool(socketPath, size, timeout)
 	}
 }
 

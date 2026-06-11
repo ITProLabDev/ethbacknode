@@ -7,6 +7,7 @@ require (
 	github.com/dgraph-io/badger v1.6.2
 	github.com/hashicorp/hcl/v2 v2.24.0
 	github.com/holiman/uint256 v1.3.1
+	github.com/pysyun/go_pysyun_pipeline v0.0.0-20260330202646-57c2fb854dbb
 	github.com/stretchr/testify v1.9.0
 	github.com/timshannon/badgerhold v1.0.0
 	github.com/tyler-smith/go-bip39 v1.1.0

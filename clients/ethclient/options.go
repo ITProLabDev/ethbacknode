@@ -2,6 +2,8 @@ package ethclient
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/ITProLabDev/ethbacknode/abi"
 	"github.com/ITProLabDev/ethbacknode/clients/urpc"
 	"github.com/ITProLabDev/ethbacknode/storage"
@@ -22,6 +24,17 @@ func WithRpcClient(nodeAddress, nodePort string, useSSL bool, headers map[string
 func WithIPCClient(ipcPath string) Option {
 	return func(client *Client) {
 		rpcClient := urpc.NewClient(urpc.WithRpcIPCSocket(ipcPath))
+		client.rpcClient = rpcClient
+	}
+}
+
+// WithIPCClientPool configures the client to talk to the node over a pool of
+// up to poolSize IPC connections, so independent RPC calls can run in parallel
+// instead of being serialized on a single socket. A poolSize <= 1 is
+// equivalent to WithIPCClient. timeout bounds each call (0 = no deadline).
+func WithIPCClientPool(ipcPath string, poolSize int, timeout time.Duration) Option {
+	return func(client *Client) {
+		rpcClient := urpc.NewClient(urpc.WithRpcIPCSocketPool(ipcPath, poolSize, timeout))
 		client.rpcClient = rpcClient
 	}
 }

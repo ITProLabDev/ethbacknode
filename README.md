@@ -212,8 +212,67 @@ Configuration examples will be added as the project evolves.
 - Mnemonic phrases and private keys must be handled securely
 - Signing endpoints should never be publicly exposed
 
+## Planned Extension: Universal Smart-Contract Layer
+
+A planned extension generalizes EthBackNode beyond ERC-20 to work with
+**arbitrary smart contracts**, with **Polymarket-class contracts**
+(Conditional Tokens Framework / ERC-1155, CLOB exchange, USDC collateral) as
+the driving use case. Polymarket is handled as a special case of a generic
+engine rather than being hardcoded.
+
+**Scope of the first phase (read-only):**
+
+- Extend the project's **own ABI implementation** (`abi/`) with dynamic types
+  (`bytes`, `string`, arrays), tuples/structs, full integer widths, and
+  **event-log decoding** (topic0 + indexed/non-indexed params). The custom ABI
+  engine is kept by design and is **not** replaced by external Ethereum
+  libraries; standard solc/Polygonscan JSON ABI is supported via a converter.
+- Decode contract **input data** and **event logs**; encode call-data and run
+  view methods via `eth_call`.
+- Read receipt logs in the watchdog in **two switchable modes**: `eth_getLogs`
+  per block, or per-transaction `eth_getTransactionReceipt`.
+- Deliver decoded contract events to subscribers as a new `contractEvent`
+  notification.
+
+Signing/broadcasting arbitrary write methods, EIP-712 order signing, and
+Polymarket domain modeling are **deferred to later phases**.
+
+See [`todo/TASKS.md`](./todo/TASKS.md) for the full milestone breakdown.
+
+### Concurrency: `tools/flow` and the IPC connection pool
+
+I/O-bound work (fetching receipts/logs, multi-asset balance queries, subscriber
+notifications) uses **`tools/flow`**, a small type-safe layer built over
+[`github.com/pysyun/go_pysyun_pipeline`](https://github.com/pysyun/go_pysyun_pipeline)
+by **PySyun**. The library provides bounded, order-preserving parallel fan-out;
+`tools/flow` wraps it so a single typed `Envelope` carries the payload, a
+`context.Context`, and explicit per-stage errors through each stage. Sincere
+thanks to the author for releasing this library — see Acknowledgements.
+
+Because the recommended node transport is a single IPC socket whose calls are
+serialized on one connection, fan-out alone would not speed up node RPC. To
+unlock it, an optional **IPC connection pool** (`urpc.WithRpcIPCSocketPool` /
+`ethclient.WithIPCClientPool`) keeps up to N live connections to `geth`,
+bounding concurrency while letting independent calls proceed in parallel.
+Enable it via the `ipcPoolSize` config parameter (default `1` = single
+connection, preserving current behavior):
+
+```hcl
+nodeUseIPC    = true
+nodeIPCSocket = "/var/tmp/geth.ipc"
+
+paramsInt = {
+  ipcPoolSize = 8   # open up to 8 parallel IPC connections to the node
+}
+```
+
+See [`todo/PIPELINE-FLOW.md`](./todo/PIPELINE-FLOW.md) for the design and
+application points.
+Implementation has not started yet — this is a design/planning artifact.
+
 ## TODO / Roadmap
 
+- [ ] Universal smart-contract layer (Polymarket-class contracts) — see [`todo/TASKS.md`](./todo/TASKS.md)
 - [ ] Configuration via environment variables
 - [ ] Migrate configuration to HCL (HashiCorp Configuration Language) format
 - [x] Basic token-based API authorization
@@ -329,6 +388,9 @@ We would like to express our sincere gratitude to:
 
 - **Bitcoin Core Developers**  
   For their foundational work on Bitcoin, its reference implementation, and the principles of decentralized, secure, and transparent blockchain systems that inspired the entire industry.
+
+- **PySyun** ([github.com/pysyun](https://github.com/pysyun)) — author of [`go_pysyun_pipeline`](https://github.com/pysyun/go_pysyun_pipeline)  
+  For the lightweight Go pipeline library (a port of the PySyun pipeline ecosystem) that powers EthBackNode's concurrent, order-preserving fan-out for I/O-bound work. Many thanks for sharing it with the community.
 
 Their dedication to open-source software, security, and decentralization is a cornerstone of this project and many others in the blockchain ecosystem.
 

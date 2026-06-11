@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/ITProLabDev/ethbacknode/abi"
 	"github.com/ITProLabDev/ethbacknode/address"
@@ -106,7 +107,17 @@ func main() {
 		ethclient.WithAbiManager(abiManager),
 	}
 	if config.NodeUseIPC {
-		clientOptions = append(clientOptions, ethclient.WithIPCClient(config.NodeIPCSocket))
+		// ipcPoolSize > 1 opens a pool of IPC connections so independent node
+		// RPC calls run in parallel instead of serializing on one socket.
+		// Defaults to 1 (single connection) for backward compatibility.
+		ipcPoolSize := config.Int("ipcPoolSize", 1)
+		if ipcPoolSize > 1 {
+			log.Info("- Node IPC connection pool size:", ipcPoolSize)
+			clientOptions = append(clientOptions,
+				ethclient.WithIPCClientPool(config.NodeIPCSocket, ipcPoolSize, 30*time.Second))
+		} else {
+			clientOptions = append(clientOptions, ethclient.WithIPCClient(config.NodeIPCSocket))
+		}
 	} else {
 		clientOptions = append(clientOptions,
 			ethclient.WithRpcClient(
