@@ -48,10 +48,11 @@ type SmartContractAbiEntry struct {
 }
 
 type SmartContractAbiEntryInput struct {
-	Name    string `json:"name,omitempty"`
-	Type    string `json:"type"`
-	Indexed bool   `json:"indexed,omitempty"`
-	data    []byte
+	Name       string                        `json:"name,omitempty"`
+	Type       string                        `json:"type"`
+	Indexed    bool                          `json:"indexed,omitempty"`
+	Components []*SmartContractAbiEntryInput `json:"components,omitempty"`
+	data       []byte
 }
 
 type SmartContractAbiEntryOutput struct {
