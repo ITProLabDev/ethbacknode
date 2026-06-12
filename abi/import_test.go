@@ -1,6 +1,7 @@
 package abi
 
 import (
+	"math/big"
 	"testing"
 )
 
@@ -114,5 +115,61 @@ func TestNewContractFromABI_RejectsBadABI(t *testing.T) {
 	}
 	if _, err := NewContractFromABI("X", "X", "0x01", []byte(`garbage`)); err == nil {
 		t.Fatal("bad json must be rejected")
+	}
+}
+
+func TestRegistry_ArbitraryContractRoundTrip(t *testing.T) {
+	m := newTestManager(t) // mem storage + hex codec, from abi_test.go
+
+	raw := `[
+	  {"type":"function","name":"balanceOf","stateMutability":"view",
+	   "inputs":[{"name":"account","type":"address"},{"name":"id","type":"uint256"}],
+	   "outputs":[{"name":"","type":"uint256"}]},
+	  {"type":"event","name":"TransferSingle","anonymous":false,
+	   "inputs":[{"name":"operator","type":"address","indexed":true},
+	             {"name":"from","type":"address","indexed":true},
+	             {"name":"to","type":"address","indexed":true},
+	             {"name":"id","type":"uint256","indexed":false},
+	             {"name":"value","type":"uint256","indexed":false}]}
+	]`
+	addr := "0xabc0000000000000000000000000000000000111"
+	c, err := NewContractFromABI("CTF", "CTF", addr, []byte(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.Add(c)
+
+	got, err := m.GetSmartContractByAddress(addr)
+	if err != nil || got.Name != "CTF" {
+		t.Fatalf("lookup by address: %v %v", got, err)
+	}
+
+	ev, err := got.Abi.GetMethodByName("TransferSingle")
+	if err != nil {
+		t.Fatal(err)
+	}
+	op := mustHex32(t, "000000000000000000000000"+"1111111111111111111111111111111111111111")
+	from := mustHex32(t, "000000000000000000000000"+"2222222222222222222222222222222222222222")
+	to := mustHex32(t, "000000000000000000000000"+"3333333333333333333333333333333333333333")
+	topics := [][32]byte{ev.Topic0(), op, from, to}
+	idsType, _ := parseType("uint256", nil)
+	valType, _ := parseType("uint256", nil)
+	data, err := encodeParams([]abiType{idsType, valType}, []any{big.NewInt(5), big.NewInt(9)})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	decoded, err := m.DecodeLog(addr, topics, data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if decoded.Name != "TransferSingle" || len(decoded.Inputs) != 5 {
+		t.Fatalf("decoded=%+v", decoded)
+	}
+	if decoded.Inputs[3].Value.(*big.Int).Int64() != 5 {
+		t.Fatalf("id=%v", decoded.Inputs[3].Value)
+	}
+	if decoded.Inputs[4].Value.(*big.Int).Int64() != 9 {
+		t.Fatalf("value=%v", decoded.Inputs[4].Value)
 	}
 }
