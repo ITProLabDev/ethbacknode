@@ -63,3 +63,39 @@ func TestGetTransactionReceipt_NotFound(t *testing.T) {
 		t.Fatalf("null result must return ErrTransactionNotFound, got %v", err)
 	}
 }
+
+func TestGetLogs_RequestParamsAndDecode(t *testing.T) {
+	c, ft := newFakeClient("[" + sampleLogJSON + "]")
+	logs, err := c.GetLogs(LogFilter{
+		FromBlock: 1000,
+		ToBlock:   2000,
+		Addresses: []string{"0xdac17f958d2ee523a2206206994597c13d831ec7"},
+		Topics:    []string{"0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ft.lastMethod != "eth_getLogs" {
+		t.Fatalf("method=%q", ft.lastMethod)
+	}
+	params := string(ft.lastParams)
+	for _, want := range []string{"0x3e8", "0x7d0", "0xdac17f958d2ee523a2206206994597c13d831ec7", "ddf252ad"} {
+		if !strings.Contains(params, want) {
+			t.Fatalf("params %s missing %q", params, want)
+		}
+	}
+	if len(logs) != 1 || logs[0].BlockNumber != 0x10d4f {
+		t.Fatalf("logs not decoded: %+v", logs)
+	}
+}
+
+func TestGetLogs_Empty(t *testing.T) {
+	c, _ := newFakeClient("[]")
+	logs, err := c.GetLogs(LogFilter{FromBlock: 1, ToBlock: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(logs) != 0 {
+		t.Fatalf("want no logs, got %d", len(logs))
+	}
+}

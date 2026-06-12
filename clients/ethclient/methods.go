@@ -22,6 +22,7 @@ const (
 	ethSendRawTransaction                  = "eth_sendRawTransaction"
 	ethGetTransactionCount                 = "eth_getTransactionCount"
 	ethCall                                = "eth_call"
+	ethGetLogs                             = "eth_getLogs"
 	txpoolСontent                          = "txpool_content"
 
 	web3Version = "web3_version"
@@ -403,4 +404,45 @@ func (c *Client) PendingNonceAt(address string) (nonce int64, err error) {
 		return 0, err
 	}
 	return nonce, nil
+}
+
+// LogFilter describes an eth_getLogs query. Block bounds are inclusive; a zero
+// ToBlock is treated as "latest". Addresses and Topics are optional filters.
+type LogFilter struct {
+	FromBlock int64
+	ToBlock   int64
+	Addresses []string
+	Topics    []string
+}
+
+// GetLogs queries event logs matching the filter via eth_getLogs.
+func (c *Client) GetLogs(filter LogFilter) ([]*Log, error) {
+	param := map[string]interface{}{
+		"fromBlock": hexnum.Int64ToHex(filter.FromBlock),
+	}
+	if filter.ToBlock > 0 {
+		param["toBlock"] = hexnum.Int64ToHex(filter.ToBlock)
+	} else {
+		param["toBlock"] = tagBlockLatest
+	}
+	if len(filter.Addresses) > 0 {
+		param["address"] = filter.Addresses
+	}
+	if len(filter.Topics) > 0 {
+		param["topics"] = filter.Topics
+	}
+	req := urpc.NewRequest(ethGetLogs)
+	req.AddParams(param)
+	result, err := c.rpcClient.Call(req)
+	if err != nil {
+		return nil, err
+	}
+	if result.Result == nil || string(result.Result) == "null" {
+		return nil, nil
+	}
+	var logs []*Log
+	if err := result.ParseResult(&logs); err != nil {
+		return nil, err
+	}
+	return logs, nil
 }
