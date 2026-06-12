@@ -12,9 +12,13 @@ var errBadScope = errors.New("invalid scope")
 
 // --- fakes for the contract RPC deps ---
 
-type fakeRegistry struct{ list map[string]string }
+type fakeRegistry struct {
+	list  map[string]string
+	known map[string]bool
+}
 
 func (f *fakeRegistry) GetSmartContractList() map[string]string { return f.list }
+func (f *fakeRegistry) IsContractKnown(address string) bool     { return f.known[address] }
 
 type fakeAdder struct {
 	name, symbol, address string
@@ -47,8 +51,11 @@ func (f *fakeSubscriber) ListSubscriptions() []map[string]string { return f.subs
 // fakeReq/fakeResp implement RpcRequest/RpcResponse for processor tests.
 type fakeReq struct{ params interface{} }
 
-func (r *fakeReq) GetMethod() RpcMethod                  { return "" }
-func (r *fakeReq) ParseParams(p interface{}) error       { b, _ := json.Marshal(r.params); return json.Unmarshal(b, p) }
+func (r *fakeReq) GetMethod() RpcMethod { return "" }
+func (r *fakeReq) ParseParams(p interface{}) error {
+	b, _ := json.Marshal(r.params)
+	return json.Unmarshal(b, p)
+}
 func (r *fakeReq) GetParamString(string) (string, error) { return "", nil }
 func (r *fakeReq) GetParamInt(string) (int64, error)     { return 0, nil }
 func (r *fakeReq) GetParamBool(string) (bool, error)     { return false, nil }
@@ -60,9 +67,17 @@ type fakeResp struct {
 	hasError bool
 }
 
-func (r *fakeResp) SetResult(v interface{})                  { r.result = v }
-func (r *fakeResp) SetError(code int, msg string)            { r.errCode = code; r.errMsg = msg; r.hasError = true }
-func (r *fakeResp) SetErrorWithData(code int, msg, d string) { r.errCode = code; r.errMsg = msg; r.hasError = true }
+func (r *fakeResp) SetResult(v interface{}) { r.result = v }
+func (r *fakeResp) SetError(code int, msg string) {
+	r.errCode = code
+	r.errMsg = msg
+	r.hasError = true
+}
+func (r *fakeResp) SetErrorWithData(code int, msg, d string) {
+	r.errCode = code
+	r.errMsg = msg
+	r.hasError = true
+}
 
 func TestContractRegister_AddsContract(t *testing.T) {
 	adder := &fakeAdder{}
@@ -96,7 +111,8 @@ func TestContractList_ReturnsRegistry(t *testing.T) {
 
 func TestContractSubscribe_RegistersSubscription(t *testing.T) {
 	sub := &fakeSubscriber{}
-	r := &BackRpc{eventLog: sub}
+	reg := &fakeRegistry{known: map[string]bool{"0xabc": true}}
+	r := &BackRpc{eventLog: sub, abiManager: reg}
 	// serviceId is a JSON number; the handler converts it to its decimal string.
 	req := &fakeReq{params: map[string]interface{}{
 		"serviceId": 7, "address": "0xabc", "scope": "managed_only",
@@ -113,12 +129,33 @@ func TestContractSubscribe_RegistersSubscription(t *testing.T) {
 
 func TestContractSubscribe_RejectsBadScope(t *testing.T) {
 	sub := &fakeSubscriber{err: errBadScope}
-	r := &BackRpc{eventLog: sub}
+	reg := &fakeRegistry{known: map[string]bool{"0xabc": true}}
+	r := &BackRpc{eventLog: sub, abiManager: reg}
 	req := &fakeReq{params: map[string]interface{}{"serviceId": 7, "address": "0xabc", "scope": "nonsense"}}
 	resp := &fakeResp{}
 	r.rpcProcessContractSubscribe(nil, req, resp)
 	if !resp.hasError {
 		t.Fatal("bad scope must error")
+	}
+}
+
+// Subscribing to an address with no registered ABI must be rejected, not
+// silently accepted (the subscriber would otherwise receive nothing because
+// decode skips unknown contracts).
+func TestContractSubscribe_RejectsUnknownContract(t *testing.T) {
+	sub := &fakeSubscriber{}
+	reg := &fakeRegistry{known: map[string]bool{}} // nothing registered
+	r := &BackRpc{eventLog: sub, abiManager: reg}
+	req := &fakeReq{params: map[string]interface{}{
+		"serviceId": 7, "address": "0xdead", "scope": "whole_contract",
+	}}
+	resp := &fakeResp{}
+	r.rpcProcessContractSubscribe(nil, req, resp)
+	if !resp.hasError {
+		t.Fatal("subscribing to an unregistered contract must error")
+	}
+	if sub.gotAddr != "" {
+		t.Fatalf("subscriber must not be called for an unknown contract, got addr=%q", sub.gotAddr)
 	}
 }
 

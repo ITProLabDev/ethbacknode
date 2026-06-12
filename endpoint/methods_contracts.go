@@ -69,6 +69,18 @@ func (r *BackRpc) rpcProcessContractSubscribe(ctx RequestContext, request RpcReq
 		response.SetError(ERROR_CODE_SERVER_ERROR, "event subscriber not configured")
 		return
 	}
+	// The contract must have a registered ABI: events of an unknown contract can
+	// never be decoded, so the subscription would silently deliver nothing.
+	// Reject up front (mirrors the legacy ERC-20 _isTokenKnown guard, but keyed
+	// on contract address) so callers register the ABI before subscribing.
+	if r.abiManager == nil {
+		response.SetError(ERROR_CODE_SERVER_ERROR, "contract registry not configured")
+		return
+	}
+	if !r.abiManager.IsContractKnown(p.Address) {
+		response.SetError(ERROR_CODE_INVALID_REQUEST, "unknown contract: register its ABI before subscribing")
+		return
+	}
 	serviceID := strconv.FormatInt(p.ServiceID, 10)
 	if err := r.eventLog.SubscribeAndSaveStrings(serviceID, p.Address, p.Scope); err != nil {
 		response.SetError(ERROR_CODE_INVALID_REQUEST, err.Error())

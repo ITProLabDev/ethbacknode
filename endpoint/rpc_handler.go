@@ -166,6 +166,10 @@ func (r *BackRpc) RegisterSecuredProcessor(method RpcMethod, processor RpcProces
 // methods need. Wired from *abi.SmartContractsManager in main.go.
 type ContractRegistry interface {
 	GetSmartContractList() map[string]string
+	// IsContractKnown reports whether a contract with the given address has a
+	// registered ABI. Used to reject subscribing to an unknown contract, whose
+	// events could never be decoded/delivered. Case-insensitive (checksum-tolerant).
+	IsContractKnown(address string) bool
 }
 
 // ContractAdder registers a new contract. Split out so registration can be
