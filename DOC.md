@@ -104,7 +104,8 @@ EthBackNode is a backend microservice for interacting with Ethereum and EVM-comp
 | `subscriptions` | `subscriptions/` | Event subscription management |
 | `txcache` | `txcache/` | Transaction caching |
 | `endpoint` | `endpoint/` | JSON-RPC HTTP server |
-| `abi` | `abi/` | Smart contract ABI management |
+| `abi` | `abi/` | Self-built smart-contract ABI engine (encode/decode, event-log decoding, standard-ABI import) |
+| `eventlog` | `eventlog/` | Per-block contract event-log collection, decoding, and scope-filtered delivery |
 
 ### Cryptographic Packages
 
@@ -221,8 +222,10 @@ data/
 │   └── txcache.db/          # Cached transactions (BadgerHold)
 ├── security/
 │   └── config.json          # Security/auth configuration
-└── abi/
-    └── known_contracts.json # Known smart contract registry
+├── abi/
+│   └── known_contracts.json # Registered smart contracts + their ABIs (persistent)
+└── eventlog/
+    └── subscriptions.json   # Contract-event subscriptions (persistent, reloaded on startup)
 ```
 
 ---
@@ -269,12 +272,27 @@ data/
 | `transferAssets` | Send native coins or tokens | Yes |
 | `transferGetEstimatedFee` | Estimate transaction fees | Yes |
 
+### Smart Contract Methods (Universal Contract Layer)
+
+Both `dot.case` and `camelCase` aliases are registered for each. See
+[`API.md`](./API.md#smart-contract-layer) for full request/response details.
+
+| Method | Description | Secured |
+|--------|-------------|---------|
+| `contractRegister` | Register a contract + its JSON ABI | Yes |
+| `contractSubscribe` | Subscribe a service to a contract's events with a `scope` | Yes |
+| `contractUnsubscribe` | Remove an event subscription | Yes |
+| `contractList` | List registered contracts (name → address) | No |
+| `contractSubscriptions` | List active event subscriptions | No |
+| `contractCall` | Call a read-only view method → decoded outputs | No |
+
 ### Event Notification Methods
 
 | Method | Description | Secured |
 |--------|-------------|---------|
 | `blockEvent` | New block notification | No |
 | `transactionEvent` | Transaction status update | No |
+| `contractEvent` | Decoded smart-contract log event (scope-filtered) | No |
 
 ---
 
@@ -449,6 +467,49 @@ Subscribers receive events via JSON-RPC 2.0 callbacks to their configured URLs:
   }
 }
 ```
+
+### Contract Event Flow (`eventlog/`)
+
+Decoded smart-contract events are delivered as `contractEvent` notifications over
+the **same** subscriber callback mechanism:
+
+1. The **watchdog** invokes `eventlog.Service.OnBlock` for each new block.
+2. The service collects the block's logs for subscribed contract addresses
+   (`eth_getLogs` by default; a per-receipt mode also exists).
+3. Each log is decoded via the **`abi`** registry (`DecodeLog`).
+4. The decoded event is **scope-filtered** per subscription
+   (`whole_contract` vs `managed_only`).
+5. Matching events are pushed to the subscriber as a `contractEvent` JSON-RPC
+   notification, carrying the fully decoded parameters.
+
+The system is **extensible by design**: a new event/notification type is a new
+subject string + payload over the same `sendNotification` path, and a new
+contract is added as ABI data via `contractRegister` — neither requires changes
+to a dispatch core.
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "contractEvent",
+  "params": {
+    "event": "TransferSingle",
+    "contract": "0x3B5E7b8ac801EA77077b889fa7A778ABcBa38380",
+    "blockNum": 20123456,
+    "txHash": "0x...",
+    "txIndex": 2,
+    "logIndex": 7,
+    "inputs": [
+      { "name": "to",    "type": "address", "value": "0x101112..." },
+      { "name": "value", "type": "uint256", "value": "1000000000000000000" }
+    ]
+  }
+}
+```
+
+> **Decoded value encoding:** integers (`uint*`/`int*`) are delivered as **decimal
+> strings** (JS-safe, no precision loss) and byte types (`address`, `bytesN`,
+> `bytes`) as **`0x`-hex strings** — never base64. See
+> [`API.md` → Decoded value format](./API.md#decoded-value-format).
 
 ---
 

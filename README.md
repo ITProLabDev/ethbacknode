@@ -191,8 +191,11 @@ The API supports operations such as:
 - Querying address activity
 - Generating Ethereum addresses and mnemonics
 - Sending ETH and ERC-20 transactions
+- **Registering arbitrary smart contracts by ABI**, subscribing to their decoded
+  events (`contractEvent`), and calling their read-only view methods
 
-A detailed method specification will be provided in the API documentation.
+See **[`API.md`](./API.md)** for the full method specification, including the
+**[Smart Contract Layer](./API.md#smart-contract-layer)**.
 
 ## Configuration
 
@@ -212,15 +215,18 @@ Configuration examples will be added as the project evolves.
 - Mnemonic phrases and private keys must be handled securely
 - Signing endpoints should never be publicly exposed
 
-## Planned Extension: Universal Smart-Contract Layer
+## Universal Smart-Contract Layer
 
-A planned extension generalizes EthBackNode beyond ERC-20 to work with
-**arbitrary smart contracts**, with **Polymarket-class contracts**
-(Conditional Tokens Framework / ERC-1155, CLOB exchange, USDC collateral) as
-the driving use case. Polymarket is handled as a special case of a generic
-engine rather than being hardcoded.
+EthBackNode generalizes beyond ERC-20 to work with **arbitrary smart contracts**,
+with **Polymarket-class contracts** (Conditional Tokens Framework / ERC-1155,
+CLOB exchange, USDC collateral) as the driving complexity target. Polymarket is
+handled as a special case of a generic engine rather than being hardcoded.
 
-**Scope of the first phase (read-only):**
+> **Status:** the read-only contract layer is **implemented** — register a
+> contract by ABI, subscribe to its decoded events (`contractEvent`), and call
+> its view methods. See **[`API.md` → Smart Contract Layer](./API.md#smart-contract-layer)**.
+
+**Scope of this phase (read-only):**
 
 - Extend the project's **own ABI implementation** (`abi/`) with dynamic types
   (`bytes`, `string`, arrays), tuples/structs, full integer widths, and
@@ -268,11 +274,11 @@ paramsInt = {
 
 See [`todo/PIPELINE-FLOW.md`](./todo/PIPELINE-FLOW.md) for the design and
 application points.
-Implementation has not started yet — this is a design/planning artifact.
 
 ## TODO / Roadmap
 
-- [ ] Universal smart-contract layer (Polymarket-class contracts) — see [`todo/TASKS.md`](./todo/TASKS.md)
+- [x] Universal smart-contract layer (read-only: ABI register, `contractEvent`, `contractCall`) — see [`todo/TASKS.md`](./todo/TASKS.md)
+- [ ] Contract write support (sign/broadcast arbitrary methods), typed `contractCall` args, EIP-712 — see [`todo/TASKS.md`](./todo/TASKS.md)
 - [ ] Configuration via environment variables
 - [ ] Migrate configuration to HCL (HashiCorp Configuration Language) format
 - [x] Basic token-based API authorization

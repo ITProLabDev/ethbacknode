@@ -49,6 +49,22 @@ The API is exposed via **JSON-RPC 2.0** and allows the client backend to interac
 
 ---
 
+### Smart Contracts (Universal Contract Layer)
+
+Describe **any** smart contract by its standard JSON ABI, then receive its events
+and call its read-only view methods. Both `dot.case` and `camelCase` names work.
+
+- `contractRegister` — Register a contract + its ABI *(secured)*
+- `contractSubscribe` — Subscribe a service to a contract's events with a `scope` *(secured)*
+- `contractUnsubscribe` — Remove an event subscription *(secured)*
+- `contractList` — List registered contracts (name → address)
+- `contractSubscriptions` — List active event subscriptions
+- `contractCall` — Call a read-only view method, returns decoded outputs
+
+See the **[Smart Contract Layer](#smart-contract-layer)** section for full details.
+
+---
+
 ## Event Notifications
 
 Event notifications are delivered asynchronously to the client backend via configured callback URL using **JSON-RPC 2.0**.
@@ -63,6 +79,15 @@ Event notifications are delivered asynchronously to the client backend via confi
 
 - `transactionEvent` — Notification about incoming or outgoing transactions  
   *(mempool, confirmation updates, and final confirmation states)*
+
+---
+
+### Contract Events
+
+- `contractEvent` — A decoded smart-contract log event, delivered to a subscriber
+  whose `scope` matched. Carries the event name, contract address, block/tx
+  context, and the fully decoded parameters. See
+  **[contractEvent](#contractevent)**.
 
 ---
 
@@ -1319,3 +1344,495 @@ The event is delivered to the configured `eventUrl` endpoint using **JSON-RPC 2.
 - Clients should rely on `txId` to deduplicate events
 - When `inPool = true`, the transaction is **not yet confirmed**
 - Amounts and fees are provided as **big integers**; formatting to fixed decimals must be done client-side if needed
+
+---
+
+# Smart Contract Layer
+
+The **Universal Contract Layer** lets you work with **arbitrary** smart contracts —
+not just the built-in native coin and ERC-20 tokens. You describe a contract by
+its standard Ethereum JSON ABI (the same ABI you get from Etherscan/Polygonscan
+or `solc`), and the service can then:
+
+1. **Decode and deliver its events** to your backend as `contractEvent`
+   notifications (push, over your webhook).
+2. **Call its read-only view methods** on demand via `contractCall` (pull).
+3. **List** what is registered and what you are subscribed to.
+
+> This is a **generic** engine. "Polymarket-class" (multi-token ERC-1155,
+> tuple/struct orders, rich events) only denotes the *complexity* it can handle;
+> there is no contract-specific logic baked in.
+
+### Quick start (the happy path)
+
+```
+1. contractRegister   — register the contract + its ABI            (once)
+2. serviceConfigSet    — make sure your eventUrl webhook is set     (once)
+3. contractSubscribe   — subscribe your serviceId with a scope      (once)
+   → from now on, matching events arrive at your webhook as `contractEvent`
+4. contractCall        — read view methods (totalSupply, …) anytime (on demand)
+```
+
+**Ordering matters:** you must `contractRegister` a contract **before** you
+`contractSubscribe` to it. Subscribing to an address with no registered ABI is
+**rejected** (`unknown contract: register its ABI before subscribing`) — events
+of an unknown contract cannot be decoded, so the subscription would deliver
+nothing. Register first, then subscribe.
+
+### Method summary
+
+| Method (dot.case / camelCase) | Secured | Purpose |
+|-------------------------------|:-------:|---------|
+| `contract.register` / `contractRegister` | 🔒 | Register a contract + canonical JSON ABI |
+| `contract.subscribe` / `contractSubscribe` | 🔒 | Subscribe a `serviceId` to a contract's events with a `scope` |
+| `contract.unsubscribe` / `contractUnsubscribe` | 🔒 | Remove a subscription |
+| `contract.list` / `contractList` | open | List registered contracts (name → address) |
+| `contract.subscriptions` / `contractSubscriptions` | open | List active event subscriptions |
+| `contract.call` / `contractCall` | open | Read-only view-method call → decoded outputs |
+
+🔒 **Secured** methods require a valid `serviceId` **and** the matching API token
+(`X-Api-Token` header) for that service, exactly like `serviceConfigSet` and the
+transfer methods. The subscriber service must already exist (register it via
+`serviceRegister` first) — you subscribe an *existing* service to contract events.
+
+### Event scopes
+
+When you `contractSubscribe`, you choose a **scope** that decides *which* of the
+contract's events are delivered to you:
+
+| Scope | Delivers |
+|-------|----------|
+| `whole_contract` | **Every** event emitted by the contract, regardless of who is involved. |
+| `managed_only` | **Only** events that involve a **managed address** — an address known to this node's address pool (subscribed/generated here). A match is made when any `address`-typed parameter of the decoded event equals a managed address. |
+
+`managed_only` is matched on the **decoded** event parameters using the same
+EIP-55 checksummed address encoding the node uses internally, so it matches
+reliably regardless of how the address casing appears on-chain.
+
+The two scopes can coexist: different services (or the same service on different
+contracts) may use different scopes. Scope is chosen per subscription at
+subscribe time, not globally.
+
+---
+
+## contractRegister
+
+🔒 **Secured.** Registers a smart contract and its ABI so the service can decode
+its events and call its methods. Registration is **persistent** — the contract
+survives restarts. Registering the same address again updates nothing new (it is
+deduplicated by address).
+
+**Method:** `contractRegister` (alias `contract.register`)
+
+#### Parameters
+
+| Field | Type | Required | Description |
+|-------|------|:--------:|-------------|
+| serviceId | int | ✅ | Your service identifier (also used for auth) |
+| address | string | ✅ | The contract address (`0x…`, EIP-55 or lowercase both accepted) |
+| abi | string | ✅ | The contract's ABI as a **JSON string** (canonical Etherscan/`solc` array form, or the project's `{ "entries": [...] }` form) |
+| name | string | optional | A human-readable name for the contract (used in `contractList`) |
+| symbol | string | optional | A short symbol/tag for the contract |
+
+> **`abi` is a JSON *string***, i.e. the ABI document serialized into a single
+> string value — not a nested JSON object. See the example.
+
+#### Request Example
+```json
+{
+  "id": 1,
+  "jsonrpc": "2.0",
+  "method": "contractRegister",
+  "params": {
+    "serviceId": 42,
+    "name": "MultiToken",
+    "symbol": "MT",
+    "address": "0x3B5E7b8ac801EA77077b889fa7A778ABcBa38380",
+    "abi": "[{\"type\":\"event\",\"name\":\"TransferSingle\",\"inputs\":[{\"name\":\"operator\",\"type\":\"address\",\"indexed\":true},{\"name\":\"from\",\"type\":\"address\",\"indexed\":true},{\"name\":\"to\",\"type\":\"address\",\"indexed\":true},{\"name\":\"id\",\"type\":\"uint256\"},{\"name\":\"value\",\"type\":\"uint256\"}]},{\"type\":\"function\",\"name\":\"totalSupply\",\"inputs\":[],\"outputs\":[{\"type\":\"uint256\"}],\"stateMutability\":\"view\"}]"
+  }
+}
+```
+
+#### Response Example
+```json
+{
+  "id": 1,
+  "jsonrpc": "2.0",
+  "result": {
+    "name": "MultiToken",
+    "address": "0x3B5E7b8ac801EA77077b889fa7A778ABcBa38380",
+    "status": "registered"
+  }
+}
+```
+
+#### Result Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| name | string | The registered name (echo of the request) |
+| address | string | The registered contract address |
+| status | string | Always `"registered"` on success |
+
+#### Errors
+
+| When | Code | Message |
+|------|------|---------|
+| `address` or `abi` missing | -32600 | `address and abi are required` |
+| ABI fails to parse/validate | -32600 | *(parser error describing the invalid ABI)* |
+| Registry not configured | -32000 | `contract registry not configured` |
+
+> **Tuple/struct outputs** in `view` methods are not yet supported by the
+> importer and such an ABI is rejected. Events with tuple **inputs** are fully
+> supported. (See the limitations note under `contractCall`.)
+
+---
+
+## contractSubscribe
+
+🔒 **Secured.** Subscribes an existing service to a registered contract's events.
+From this point, every event that matches your `scope` is pushed to your
+configured `eventUrl` as a `contractEvent` notification. Subscriptions are
+**persistent** and resume after a restart.
+
+**Method:** `contractSubscribe` (alias `contract.subscribe`)
+
+#### Parameters
+
+| Field | Type | Required | Description |
+|-------|------|:--------:|-------------|
+| serviceId | int | ✅ | The service that will receive the events (also used for auth) |
+| address | string | ✅ | The contract address to subscribe to (**must already be registered**) |
+| scope | string | ✅ | `whole_contract` or `managed_only` (see [Event scopes](#event-scopes)) |
+
+#### Request Example
+```json
+{
+  "id": 1,
+  "jsonrpc": "2.0",
+  "method": "contractSubscribe",
+  "params": {
+    "serviceId": 42,
+    "address": "0x3B5E7b8ac801EA77077b889fa7A778ABcBa38380",
+    "scope": "managed_only"
+  }
+}
+```
+
+#### Response Example
+```json
+{
+  "id": 1,
+  "jsonrpc": "2.0",
+  "result": {
+    "serviceId": 42,
+    "address": "0x3B5E7b8ac801EA77077b889fa7A778ABcBa38380",
+    "scope": "managed_only",
+    "status": "subscribed"
+  }
+}
+```
+
+#### Errors
+
+| When | Code | Message |
+|------|------|---------|
+| `serviceId` or `address` missing | -32600 | `serviceId and address are required` |
+| Contract not registered | -32600 | `unknown contract: register its ABI before subscribing` |
+| Invalid `scope` | -32600 | `unknown event scope "…" (want whole_contract \| managed_only)` |
+| Event subscriber not configured | -32000 | `event subscriber not configured` |
+
+---
+
+## contractUnsubscribe
+
+🔒 **Secured.** Removes a service's subscription to a contract's events.
+Idempotent — removing a non-existent subscription is a no-op success.
+
+**Method:** `contractUnsubscribe` (alias `contract.unsubscribe`)
+
+#### Parameters
+
+| Field | Type | Required | Description |
+|-------|------|:--------:|-------------|
+| serviceId | int | ✅ | The subscribed service (also used for auth) |
+| address | string | ✅ | The contract address to unsubscribe from |
+
+#### Request Example
+```json
+{
+  "id": 1,
+  "jsonrpc": "2.0",
+  "method": "contractUnsubscribe",
+  "params": {
+    "serviceId": 42,
+    "address": "0x3B5E7b8ac801EA77077b889fa7A778ABcBa38380"
+  }
+}
+```
+
+#### Response Example
+```json
+{
+  "id": 1,
+  "jsonrpc": "2.0",
+  "result": {
+    "serviceId": 42,
+    "address": "0x3B5E7b8ac801EA77077b889fa7A778ABcBa38380",
+    "status": "unsubscribed"
+  }
+}
+```
+
+---
+
+## contractList
+
+**Open.** Returns all registered contracts as a `name → address` map.
+
+**Method:** `contractList` (alias `contract.list`)
+
+#### Parameters
+None.
+
+#### Request Example
+```json
+{ "id": 1, "jsonrpc": "2.0", "method": "contractList" }
+```
+
+#### Response Example
+```json
+{
+  "id": 1,
+  "jsonrpc": "2.0",
+  "result": {
+    "MultiToken": "0x3B5E7b8ac801EA77077b889fa7A778ABcBa38380",
+    "USDT": "0x3B5E7b8ac801EA77077b889fa7A778ABcBa38380"
+  }
+}
+```
+
+#### Result
+
+A JSON object mapping each registered contract's **name** to its **address**.
+
+---
+
+## contractSubscriptions
+
+**Open.** Returns all active event subscriptions across all services.
+
+**Method:** `contractSubscriptions` (alias `contract.subscriptions`)
+
+#### Parameters
+None.
+
+#### Request Example
+```json
+{ "id": 1, "jsonrpc": "2.0", "method": "contractSubscriptions" }
+```
+
+#### Response Example
+```json
+{
+  "id": 1,
+  "jsonrpc": "2.0",
+  "result": [
+    {
+      "serviceId": "42",
+      "address": "0x3b5e7b8ac801ea77077b889fa7a778abcba38380",
+      "scope": "managed_only"
+    }
+  ]
+}
+```
+
+#### Result Fields (per entry)
+
+| Field | Type | Description |
+|-------|------|-------------|
+| serviceId | string | The subscribed service id (as a string) |
+| address | string | The contract address (stored lowercased) |
+| scope | string | `whole_contract` or `managed_only` |
+
+---
+
+## contractCall
+
+**Open.** Calls a **read-only** (`view` / `pure`) method of a registered
+contract via `eth_call` and returns the **decoded** outputs. Use this to read
+on-demand state such as `totalSupply`, `decimals`, `name`, `symbol`, etc.
+
+**Method:** `contractCall` (alias `contract.call`)
+
+#### Parameters
+
+| Field | Type | Required | Description |
+|-------|------|:--------:|-------------|
+| address | string | ✅ | The contract address (must be registered) |
+| method | string | ✅ | The view method name to call (e.g. `totalSupply`) |
+| args | array | optional | Positional arguments — **see limitation below** |
+
+> ⚠️ **First-cut limitation — no-argument methods only.** Passing a non-empty
+> `args` array currently returns the error `contractCall with arguments is not
+> yet supported`. This is deliberate: typed argument encoding from JSON
+> (`uint256`, `address`, tuples, …) is a planned follow-up, and the service
+> refuses rather than risk mis-encoding. No-arg view methods (`totalSupply`,
+> `decimals`, `name`, `symbol`, …) work today.
+
+#### Request Example
+```json
+{
+  "id": 1,
+  "jsonrpc": "2.0",
+  "method": "contractCall",
+  "params": {
+    "address": "0x3B5E7b8ac801EA77077b889fa7A778ABcBa38380",
+    "method": "totalSupply"
+  }
+}
+```
+
+#### Response Example
+```json
+{
+  "id": 1,
+  "jsonrpc": "2.0",
+  "result": [
+    {
+      "type": "uint256",
+      "value": "100000000000000000000"
+    }
+  ]
+}
+```
+
+#### Result
+
+An **array of decoded values** in the method's declared output order. Each
+element follows the **[Decoded value format](#decoded-value-format)** below.
+Output values carry their declared `name` when the ABI names them.
+
+#### Errors
+
+| When | Code | Message |
+|------|------|---------|
+| `address` or `method` missing | -32600 | `address and method are required` |
+| `args` provided | -32600 | `contractCall with arguments is not yet supported` |
+| Contract caller not configured | -32000 | `contract caller not configured` |
+| Call/decoding failed | -32600 | *(underlying error, e.g. unknown contract / method)* |
+
+---
+
+## contractEvent
+
+**Notification (push).** Delivered to a subscriber's configured `eventUrl` over
+HTTP POST as a JSON-RPC 2.0 notification, whenever a decoded contract log event
+matches that subscriber's subscription `scope`. This is the asynchronous
+counterpart to the on-demand `contractCall`.
+
+Delivery uses the **same webhook mechanism** as `blockEvent` / `transactionEvent`
+(see [Events & Webhooks](#events--webhooks) for the delivery model, ordering, and
+at-least-once semantics).
+
+#### Notification Example
+```json
+{
+  "id": 1,
+  "jsonrpc": "2.0",
+  "method": "contractEvent",
+  "params": {
+    "event": "TransferSingle",
+    "contract": "0x3B5E7b8ac801EA77077b889fa7A778ABcBa38380",
+    "blockNum": 20123456,
+    "txHash": "0x4b1edb1329619c67467fb916a0b78938eb878078ac59ba9afdd7a34b0646e02e",
+    "txIndex": 2,
+    "logIndex": 7,
+    "inputs": [
+      { "name": "operator", "type": "address", "value": "0x101112131415161718191a1b1c1d1e1f20212223" },
+      { "name": "from",     "type": "address", "value": "0xa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3" },
+      { "name": "to",       "type": "address", "value": "0x101112131415161718191a1b1c1d1e1f20212223" },
+      { "name": "id",       "type": "uint256", "value": "7" },
+      { "name": "value",    "type": "uint256", "value": "1000000000000000000" }
+    ]
+  }
+}
+```
+
+#### Notification Parameters
+
+| Field | Type | Description |
+|-------|------|-------------|
+| event | string | The event name (e.g. `Transfer`, `TransferSingle`) |
+| contract | string | The emitting contract address (as registered) |
+| blockNum | int64 | Block number containing the log |
+| txHash | string | Transaction hash that produced the log |
+| txIndex | int64 | Index of the transaction within the block |
+| logIndex | int64 | Index of the log within the block |
+| removed | bool | *(present only when `true`)* the log was reverted by a chain reorg |
+| inputs | array | The decoded event parameters in ABI order — see [Decoded value format](#decoded-value-format) |
+
+#### Notes
+
+- An event is delivered **once per matching subscription**. If two services
+  subscribe to the same contract, each receives its own `contractEvent`.
+- For `managed_only` subscriptions, only events involving a managed address are
+  delivered (matched on the decoded `address`-typed parameters).
+- **Reorgs:** if a previously delivered log is reverted, a follow-up event with
+  `"removed": true` may be delivered. Treat `removed` events as a revert signal.
+- Delivery is **at-least-once**; deduplicate using
+  `(txHash, logIndex)` which is unique per log.
+
+---
+
+## Decoded value format
+
+Both `contractEvent.inputs[]` and `contractCall` results are arrays of **decoded
+values**. Every decoded value has this shape:
+
+```json
+{ "name": "value", "type": "uint256", "value": <encoded> }
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| name | string | The parameter/output name from the ABI (**omitted** if the ABI does not name it) |
+| type | string | The ABI type (`address`, `uint256`, `bool`, `string`, `bytes`, `bytes32`, `uint256[]`, `tuple`, …) |
+| value | varies | The decoded value, **encoded JSON-safely** as described below |
+
+### How `value` is encoded (read this for safe integration)
+
+The wire encoding is chosen so that **every value is safe to parse in any
+language, including JavaScript** — no precision loss, no base64 surprises:
+
+| ABI type | `value` JSON form | Example |
+|----------|-------------------|---------|
+| `uintN`, `intN` (incl. `uint256`) | **decimal STRING** | `"1000000000000000000"` |
+| `address` | **`0x`-prefixed lowercase hex** string (20 bytes) | `"0xa0a1…b2b3"` |
+| `bytesN`, `bytes` | **`0x`-prefixed lowercase hex** string (empty → `"0x"`) | `"0xdeadbeef"` |
+| `bool` | native JSON boolean | `true` |
+| `string` | native JSON string | `"hello"` |
+| `T[]`, `T[N]` (arrays) | JSON **array** of decoded values | `[{ "type":"uint256","value":"10" }, …]` |
+| `tuple` / struct | JSON **array** of decoded values (one per component) | `[{ "type":"address","value":"0x…" }, …]` |
+
+> 🔑 **Integers are strings, not numbers.** `uint256` values routinely exceed
+> JavaScript's `Number.MAX_SAFE_INTEGER` (2⁵³). They are delivered as **decimal
+> strings** so `JSON.parse` never silently corrupts them. Parse them with a
+> big-integer type (`BigInt(value)` in JS, `int`/`Decimal` in Python, etc.).
+
+> 🔑 **Byte types are `0x`-hex, not base64.** Addresses and byte values are
+> always `0x`-prefixed lowercase hex strings, ready to use directly.
+
+#### Indexed reference-type parameters
+
+Per the Ethereum ABI spec, an **indexed** parameter of a *reference* type
+(`string`, `bytes`, arrays, or tuples) is stored in the log topics only as its
+`keccak256` **hash**, not its original value — the value is **not recoverable**
+from the log. For such parameters:
+
+- `type` carries a ` (indexed)` suffix (e.g. `"string (indexed)"`) — this is a
+  **display marker only**, not a valid ABI type string.
+- `value` is the 32-byte hash as a `0x`-hex string.
+
+Indexed *value* types (`address`, `uintN`, `intN`, `bool`, `bytesN`) are decoded
+to their real values normally.

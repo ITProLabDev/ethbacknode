@@ -1,6 +1,7 @@
 # Universal Smart-Contract Layer — TASKS
 
-**Status:** Design / planning. **Implementation NOT started.**
+**Status:** Read-only phase **COMPLETE** — M1–M7 all done (2026-06-13). Write
+support / typed `contractCall` args / EIP-712 remain in Future Phases.
 **Goal:** extend EthBackNode to work with arbitrary smart contracts, with
 Polymarket-class contracts (Conditional Tokens Framework / ERC-1155, CLOB
 exchange, USDC collateral) as the driving use case.
@@ -334,15 +335,31 @@ than mis-encoding. `go test ./eventlog/ ./endpoint/ ./abi/ -race` clean,
 - [x] **M6.4** Persist registered contracts (abi manager Saves on `Add`) and
       subscriptions (`data/eventlog/subscriptions.json`, reloaded on startup).
 
-## Milestone 7 — Docs & tests
+## Milestone 7 — Docs & tests  ✅ DONE
 
-- [ ] **M7.1** Update `DOC.md` (package table, interfaces, config, new RPC
-      methods + `contractEvent` notification).
-- [ ] **M7.2** Update `API.md` with new methods and event payloads.
-- [ ] **M7.3** End-to-end test: register a generic contract-class ABI
-      (multitoken / outcome-market / CLOB fixtures), replay a block with known
-      logs, assert decoded `contractEvent` output for ALL the contract's events.
-- [ ] **M7.4** `go test ./...` and `-race` clean.
+> **Pre-doc fix (2026-06-13):** before documenting, the `contractEvent` /
+> `contractCall` decoded-value wire format was made client-safe via
+> `abi.DecodedValue.MarshalJSON`: byte types (`address`/`bytesN`/`bytes`) →
+> `0x`-hex strings (not base64); big integers (`uint*`/`int*`) → decimal STRINGS
+> (not bare JSON numbers, which JS `JSON.parse` corrupts above 2^53). The in-memory
+> Value type is unchanged. Also: `contract.subscribe` now rejects unregistered
+> contracts (see M6 carry-over RESOLVED). All docs describe the fixed format.
+
+- [x] **M7.1** Update `DOC.md` (package table, interfaces, config, new RPC
+      methods + `contractEvent` notification, contract event flow, data dir).
+- [x] **M7.2** Update `API.md` with new methods and event payloads — full
+      Smart Contract Layer section (6 methods + `contractEvent` + Decoded value
+      format + integration quick-start). README updated (layer now implemented).
+- [x] **M7.3** End-to-end test (`endpoint/e2e_contract_event_test.go`): registers
+      a generic multitoken-class ABI via the REAL abi manager, replays a block's
+      log through the REAL eventlog + decoder + EIP-55 codec + sink, and asserts
+      the delivered `contractEvent` wire JSON for BOTH scopes — including the M5
+      checksummed managed-address invariant and the JS-safe value encoding.
+- [x] **M7.4** `-race` clean across all packages EXCEPT three with **pre-existing,
+      unrelated** failures (proven by `git stash` on the clean base): build env
+      issue in `crypto/secp256k1` (Go stdlib `ecdsa.Sign` signature), missing
+      `testdata/*.in.txt` fixtures in `common/rlp/rlpgen`, and `uniclient`
+      `TestClient` (needs a live node). None are in the M1–M7 diff.
 
 ---
 

@@ -4,10 +4,15 @@
 > any device. It captures the goal, every milestone's state, the exact branch &
 > commits, carry-over notes, and the next concrete steps. Last updated after M6.
 
-**Last updated:** 2026-06-12
+**Last updated:** 2026-06-13
 **Branch:** `feature/ipc-pool-and-flow` (NOT yet merged to `main`)
-**HEAD at last update:** `6cc69c5` (docs(m6): mark M6 complete)
-**Build/test health:** `go build ./...` clean; `go test ./eventlog/ ./endpoint/ ./abi/ -race` all green. (Pre-existing unrelated issues only: a compile error in `crypto/secp256k1` in some environments, and 3 `go vet` warnings in `endpoint/methods_info.go` + `endpoint/rpc_request.go` — both pre-date this work.)
+**HEAD at last update:** `acfe91f` + uncommitted M7 work (docs + format fix + e2e test + subscribe guard)
+**Build/test health:** `go build ./...` clean; `-race` green for ALL packages
+except three with **pre-existing, unrelated** failures (proven on the clean base
+via `git stash`): `crypto/secp256k1` (env build issue — stdlib `ecdsa.Sign`
+arity), `common/rlp/rlpgen` (missing `testdata/*.in.txt` fixtures), and
+`uniclient` `TestClient` (needs a live node). The 3 `go vet` warnings in
+`endpoint/methods_info.go` + `endpoint/rpc_request.go` also pre-date this work.
 
 ---
 
@@ -43,8 +48,8 @@ Polymarket-specific integration.
 | M3 | Standard ABI import & generalized registry | ✅ DONE |
 | M4 | Client: receipts / logs / `CallMethod` | ✅ DONE |
 | M5 | Event-log service (`eventlog/` package) | ✅ DONE |
-| **M6** | **Delivery & API (contractEvent + contract RPC)** | **✅ DONE** |
-| M7 | Docs & end-to-end tests | ⬜ NEXT |
+| M6 | Delivery & API (contractEvent + contract RPC) | ✅ DONE |
+| **M7** | **Docs & end-to-end tests** | **✅ DONE** |
 | Side | IPC connection pool | ✅ DONE |
 | Side | `tools/flow` typed Envelope over go_pysyun_pipeline | ✅ DONE |
 | Side | `--init Eth\|Arc` chain-profile bootstrap flag | ✅ DONE |
@@ -150,27 +155,67 @@ Plan: `docs/superpowers/plans/2026-06-12-m6-delivery-and-api.md`.
 
 ---
 
-## 4. Next up — M7 (Docs & tests)
+## 4. M7 — Docs & tests (just completed)
 
-From `todo/TASKS.md` Milestone 7. Suggested concrete steps:
-1. **`DOC.md` / `API.md`** documenting the new RPC methods (params, scope values,
-   secured vs open, `contractCall` no-arg limitation, the `contractEvent`
-   notification payload shape: `{event, contract, blockNum, txHash, txIndex,
-   logIndex, removed?, inputs[]}`).
-2. **End-to-end test** with a real EIP-55 checksummed managed address exercising
-   the `managed_only` scope (the M5 carry-over explicitly asks for this — see §5).
-3. `go test ./... -race` clean across the whole repo (work around the pre-existing
-   `crypto/secp256k1` issue if it surfaces).
+**What it delivers:** complete client-facing documentation of the contract layer,
+a client-safe wire format for decoded values, and a real end-to-end test.
+
+### Pre-doc format fix (client-safe decoded values)
+Before documenting, the `contractEvent` / `contractCall` decoded-value wire form
+was found to be hostile to clients and fixed via `abi.DecodedValue.MarshalJSON`
+(`abi/value.go`, TDD in `abi/value_test.go`):
+- **byte types** (`address`, `bytesN`, `bytes`) → `0x`-lowercase-hex strings
+  (was base64 — a 20-byte address serialized as `"AAA…AAE="`).
+- **big integers** (`uint*`/`int*`) → **decimal STRINGS** (was bare JSON numbers,
+  which JS `JSON.parse` silently corrupts above 2^53 — i.e. most token amounts).
+- bool/string native; arrays/tuples (`[]DecodedValue`) recurse. The in-memory
+  `Value` type is unchanged; only JSON output is transformed. Decision made with
+  the user 2026-06-13 ("починить формат, потом документировать").
+
+### Subscribe-before-register guard (M6 carry-over RESOLVED)
+`contract.subscribe` now rejects an unregistered contract address
+(`unknown contract: register its ABI before subscribing`) via the new
+`abi.IsContractKnown` (checksum-tolerant) exposed on the endpoint
+`ContractRegistry` seam — mirrors the legacy ERC-20 `_isTokenKnown` guard but
+keyed on contract address. Decision made with the user 2026-06-13.
+
+### Docs written
+- **`API.md`**: a full **Smart Contract Layer** section — quick-start, scope
+  semantics, all 6 methods (params/results/errors, secured vs open, both name
+  aliases), the `contractEvent` notification payload, and a **Decoded value
+  format** subsection spelling out the JS-safe encoding + indexed-reference
+  caveat. Overview lists + event-notifications list updated.
+- **`DOC.md`**: contract method table, `contractEvent` flow under Event System,
+  `eventlog` package row, and the `data/eventlog/subscriptions.json` dir entry.
+- **`README.md`**: contract layer moved from "Planned" to "implemented"; API
+  bullets + roadmap updated; stale "implementation not started" flow note removed.
+
+### End-to-end test
+`endpoint/e2e_contract_event_test.go` (package `endpoint_test`): registers a
+generic multitoken-class ABI in the **real** `abi.SmartContractsManager`, replays
+a block's `TransferSingle` log through the **real** `eventlog.Service` +
+`NewDecoder(abiManager.DecodeLog)` + **real EIP-55 codec** + `NewContractEventSink`,
+and asserts the delivered `contractEvent` **wire JSON** for both scopes —
+`whole_contract` (asserts `to` is `0x`-hex and `value`/`id` are decimal strings,
+locking in the format fix) and `managed_only` (asserts the **checksummed
+managed-address invariant** matches, and does NOT match when no managed address
+is involved). The managed set is a faithful exact-string stand-in for
+`address.Manager` (whose `LookupString` is exact-byte) to avoid the pool's
+async Badger init in a unit test; the codec — the actual source of the invariant
+— is the real one.
 
 ---
 
-## 5. Carry-over / known items (read before M7 or related work)
+## 5. Carry-over / known items
 
 ### From M6 final review (Minor — polish, not blockers)
-- **Subscribe-before-register is silent:** you can `contract.subscribe` to an
-  address with no registered ABI; you'll get `{"status":"subscribed"}` but
-  receive nothing (decode skips unknown contracts). Consider a soft warning at
-  subscribe time or document register-then-subscribe ordering in M7.
+- ~~**Subscribe-before-register is silent:**~~ **RESOLVED (2026-06-12).**
+  `contract.subscribe` now rejects an address with no registered ABI
+  (`"unknown contract: register its ABI before subscribing"`, INVALID_REQUEST)
+  instead of silently accepting it. Implemented via `abi.IsContractKnown`
+  (checksum-tolerant, reuses `GetSmartContractByAddress`) exposed on the
+  endpoint `ContractRegistry` seam and guarded in `rpcProcessContractSubscribe`
+  — mirrors the legacy ERC-20 `_isTokenKnown` guard, keyed on contract address.
 - **`main.go` `eventlog.WithConfig(eventlog.DefaultConfig())` is redundant** —
   `New()` already defaults the config. Can drop for clarity.
 
