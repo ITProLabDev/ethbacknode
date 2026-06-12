@@ -54,26 +54,8 @@ func (c *Config) coldStart() (err error) {
 	if c.storage == nil {
 		return ErrConfigStorageEmpty
 	}
-	c.ChainName = "Ethereum"
-	c.ChainId = "ethereum"
-	c.ChainSymbol = "ETH"
-	c.Decimals = 18
-	c.Confirmations = 20
-	c.Tokens = []*types.TokenInfo{
-		{
-			Name:            "TetherToken",
-			Symbol:          "USDT",
-			Decimals:        6,
-			ContractAddress: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
-			Protocol:        "TRC20",
-		},
-		{
-			Name:            "USD Coin",
-			Symbol:          "USDC",
-			Decimals:        6,
-			ContractAddress: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
-			Protocol:        "TRC20",
-		},
-	}
+	// Default cold-start identity is the Ethereum profile (preserves the
+	// historical behavior). `--init <chain>` selects a different profile.
+	c.ApplyProfile(ethProfile())
 	return c.Save()
 }

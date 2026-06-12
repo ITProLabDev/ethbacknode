@@ -38,6 +38,8 @@ const (
 var (
 	// globalConfigPath is the path to the configuration file (default: config.hcl).
 	globalConfigPath = "config.hcl"
+	// initChain holds the --init chain profile name (empty = normal startup).
+	initChain string
 	// config holds the global application configuration.
 	config = &Config{
 		storage: _configDefaultStorage(),
@@ -60,6 +62,10 @@ var (
 // 8. Security manager - API authentication
 // 9. RPC endpoint server - JSON-RPC 2.0 HTTP server
 func main() {
+	parseFlags()
+	if initChain != "" {
+		bootstrapAndExit() // generates config for the chain profile and exits
+	}
 	signal.Notify(osSig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	log.Info(APP_NAME, CHAIN_NAME, " Connection Adapter", APP_VERSION)
 	configStorage, err := storage.NewBinFileStorage("Config", "", "", globalConfigPath)
@@ -268,17 +274,55 @@ func run() {
 	}
 }
 
-// init parses command-line flags before main() is called.
+// parseFlags parses command-line flags. It is called from main() (NOT from an
+// init() function) so that `go test` — which parses its own flags during
+// startup — is not disrupted.
+//
 // Supported flags:
 //   - config: path to configuration file (default: config.hcl)
-//   - help: display usage information
-func init() {
+//   - init:   bootstrap config for a chain profile (Eth | Arc) and exit
+//   - help:   display usage information
+func parseFlags() {
 	var help bool
 	flag.StringVar(&globalConfigPath, "config", "config.hcl", "Path to global config file")
+	flag.StringVar(&initChain, "init", "", "Bootstrap config for a chain profile (Eth | Arc) and exit")
 	flag.BoolVar(&help, "help", false, "Show help")
 	flag.Parse()
 	if help {
 		flag.Usage()
 		os.Exit(0)
 	}
+}
+
+// bootstrapAndExit handles the --init flag: it generates config files for the
+// selected chain profile (without overwriting existing ones) and exits. Called
+// from main() only when initChain is non-empty.
+func bootstrapAndExit() {
+	mainStorage, err := storage.NewBinFileStorage("Config", "", "", globalConfigPath)
+	if err != nil {
+		log.Error("Can not open config storage:", err)
+		os.Exit(-1)
+	}
+	clientStorage, err := storage.NewBinFileStorage("Config", "data", "client", "config.json")
+	if err != nil {
+		log.Error("Can not open client config storage:", err)
+		os.Exit(-1)
+	}
+	res, err := runInit(initChain, mainStorage, clientStorage)
+	if err != nil {
+		log.Error("Init failed:", err)
+		os.Exit(-1)
+	}
+	if res.WroteMain {
+		log.Info("Wrote", globalConfigPath)
+	} else {
+		log.Info("Kept existing", globalConfigPath, "(not overwritten)")
+	}
+	if res.WroteClient {
+		log.Info("Wrote data/client/config.json for chain:", initChain)
+	} else {
+		log.Info("Kept existing data/client/config.json (not overwritten)")
+	}
+	log.Info("Init complete for chain profile:", initChain)
+	os.Exit(0)
 }
