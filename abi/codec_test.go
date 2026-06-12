@@ -265,3 +265,54 @@ func TestEncodeDecode_ArrayOfDynamicElement(t *testing.T) {
 		t.Fatalf("array=%+v", arr)
 	}
 }
+
+func TestEncodeDecode_Tuple(t *testing.T) {
+	comps := []*SmartContractAbiEntryInput{
+		{Name: "a", Type: "uint256"},
+		{Name: "s", Type: "string"},
+	}
+	tt, err := parseType("tuple", comps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := encodeParams([]abiType{tt}, []any{[]any{big.NewInt(42), "hi"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	vals, err := decodeParams([]abiType{tt}, out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fields := vals[0].Value.([]DecodedValue)
+	if fields[0].Value.(*big.Int).Int64() != 42 || fields[1].Value.(string) != "hi" {
+		t.Fatalf("tuple=%+v", fields)
+	}
+	if fields[0].Name != "a" || fields[1].Name != "s" {
+		t.Fatalf("tuple names not populated: %+v", fields)
+	}
+}
+
+func TestEncodeParams_Sam_CanonicalVector(t *testing.T) {
+	// sam(bytes,bool,uint256[]) with ("dave", true, [1,2,3])
+	bts, _ := parseType("bytes", nil)
+	bl, _ := parseType("bool", nil)
+	arr, _ := parseType("uint256[]", nil)
+	out, err := encodeParams([]abiType{bts, bl, arr},
+		[]any{[]byte("dave"), true, []any{big.NewInt(1), big.NewInt(2), big.NewInt(3)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := hexToBytes(t,
+		"0000000000000000000000000000000000000000000000000000000000000060"+
+			"0000000000000000000000000000000000000000000000000000000000000001"+
+			"00000000000000000000000000000000000000000000000000000000000000a0"+
+			"0000000000000000000000000000000000000000000000000000000000000004"+
+			"6461766500000000000000000000000000000000000000000000000000000000"+
+			"0000000000000000000000000000000000000000000000000000000000000003"+
+			"0000000000000000000000000000000000000000000000000000000000000001"+
+			"0000000000000000000000000000000000000000000000000000000000000002"+
+			"0000000000000000000000000000000000000000000000000000000000000003")
+	if !bytes.Equal(out, want) {
+		t.Fatalf("got\n%x\nwant\n%x", out, want)
+	}
+}

@@ -137,6 +137,12 @@ func encodeValue(t abiType, v any) ([]byte, error) {
 			return nil, err
 		}
 		return append(leftPad32(big.NewInt(int64(len(elems))).Bytes()), body...), nil
+	case kindTuple:
+		elems, ok := v.([]any)
+		if !ok || len(elems) != len(t.fields) {
+			return nil, fmt.Errorf("%w: tuple of %d expected", ErrInvalidParamsData, len(t.fields))
+		}
+		return encodeParams(t.fields, elems)
 	}
 	return nil, fmt.Errorf("%w: unsupported type %q", ErrInvalidParamsData, t.canonical())
 }
@@ -289,6 +295,20 @@ func decodeValue(t abiType, block []byte, at int) (DecodedValue, error) {
 		vals, err := decodeParams(repeatType(*t.elem, n), block[at+32:])
 		if err != nil {
 			return dv, err
+		}
+		dv.Value = vals
+		return dv, nil
+	case kindTuple:
+		// Offsets inside a tuple body are relative to the tuple's own start,
+		// so re-base at `at` for both static and dynamic tuples.
+		vals, err := decodeParams(t.fields, block[at:])
+		if err != nil {
+			return dv, err
+		}
+		for i := range vals {
+			if i < len(t.names) {
+				vals[i].Name = t.names[i]
+			}
 		}
 		dv.Value = vals
 		return dv, nil

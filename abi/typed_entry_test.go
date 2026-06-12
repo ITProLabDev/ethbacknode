@@ -111,3 +111,39 @@ func TestEncodeInputsTyped_RoundTrip(t *testing.T) {
 		t.Fatalf("amount round-trip: %v", decoded.Inputs[1].Value)
 	}
 }
+
+func TestDecodeInputsTyped_WithRealTuple(t *testing.T) {
+	e := &SmartContractAbiEntry{
+		Name: "order",
+		Type: "Function",
+		Inputs: []*SmartContractAbiEntryInput{
+			{Name: "o", Type: "tuple", Components: []*SmartContractAbiEntryInput{
+				{Name: "amt", Type: "uint256"},
+				{Name: "maker", Type: "address"},
+			}},
+		},
+	}
+	maker := make([]byte, 20)
+	maker[0], maker[19] = 0xaa, 0xbb
+	callData, err := e.EncodeInputsTyped([]any{big.NewInt(77), maker})
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := e.DecodeInputsTyped(callData)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if decoded.Method != "order" || len(decoded.Inputs) != 1 {
+		t.Fatalf("decoded=%+v", decoded)
+	}
+	fields := decoded.Inputs[0].Value.([]DecodedValue)
+	if len(fields) != 2 || fields[0].Value.(*big.Int).Int64() != 77 {
+		t.Fatalf("tuple fields=%+v", fields)
+	}
+	if !bytes.Equal(fields[1].Value.([]byte), maker) {
+		t.Fatalf("maker=%x", fields[1].Value)
+	}
+	if fields[0].Name != "amt" || fields[1].Name != "maker" {
+		t.Fatalf("tuple field names not populated: %+v", fields)
+	}
+}
