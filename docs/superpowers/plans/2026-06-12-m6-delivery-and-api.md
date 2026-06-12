@@ -537,8 +537,11 @@ type ContractAdder interface {
 }
 
 // EventSubscriber is the subset of eventlog.Service the subscribe RPC needs.
+// Method names match *eventlog.Service exactly (SubscribeAndSave(*Subscription)
+// is already taken there, hence the ...Strings suffix on the string-param form).
 type EventSubscriber interface {
-	SubscribeAndSave(serviceID, contractAddress, scope string) error
+	SubscribeAndSaveStrings(serviceID, contractAddress, scope string) error
+	UnsubscribeStrings(serviceID, contractAddress string) error
 	ListSubscriptions() []map[string]string
 }
 
@@ -592,12 +595,17 @@ func (f *fakeAdder) AddContractFromABI(name, symbol, address string, rawABI []by
 
 type fakeSubscriber struct {
 	gotService, gotAddr, gotScope string
+	unsubService, unsubAddr       string
 	err                           error
 	subs                          []map[string]string
 }
 
-func (f *fakeSubscriber) SubscribeAndSave(serviceID, contractAddress, scope string) error {
+func (f *fakeSubscriber) SubscribeAndSaveStrings(serviceID, contractAddress, scope string) error {
 	f.gotService, f.gotAddr, f.gotScope = serviceID, contractAddress, scope
+	return f.err
+}
+func (f *fakeSubscriber) UnsubscribeStrings(serviceID, contractAddress string) error {
+	f.unsubService, f.unsubAddr = serviceID, contractAddress
 	return f.err
 }
 func (f *fakeSubscriber) ListSubscriptions() []map[string]string { return f.subs }
@@ -655,8 +663,9 @@ func TestContractList_ReturnsRegistry(t *testing.T) {
 func TestContractSubscribe_RegistersSubscription(t *testing.T) {
 	sub := &fakeSubscriber{}
 	r := &BackRpc{eventLog: sub}
+	// serviceId is a JSON number; the handler converts it to its decimal string.
 	req := &fakeReq{params: map[string]interface{}{
-		"serviceId": "7", "address": "0xabc", "scope": "managed_only",
+		"serviceId": 7, "address": "0xabc", "scope": "managed_only",
 	}}
 	resp := &fakeResp{}
 	r.rpcProcessContractSubscribe(nil, req, resp)
@@ -671,14 +680,30 @@ func TestContractSubscribe_RegistersSubscription(t *testing.T) {
 func TestContractSubscribe_RejectsBadScope(t *testing.T) {
 	sub := &fakeSubscriber{err: errBadScope}
 	r := &BackRpc{eventLog: sub}
-	req := &fakeReq{params: map[string]interface{}{"serviceId": "7", "address": "0xabc", "scope": "nonsense"}}
+	req := &fakeReq{params: map[string]interface{}{"serviceId": 7, "address": "0xabc", "scope": "nonsense"}}
 	resp := &fakeResp{}
 	r.rpcProcessContractSubscribe(nil, req, resp)
 	if !resp.hasError {
 		t.Fatal("bad scope must error")
 	}
 }
+
+func TestContractUnsubscribe_RemovesSubscription(t *testing.T) {
+	sub := &fakeSubscriber{}
+	r := &BackRpc{eventLog: sub}
+	req := &fakeReq{params: map[string]interface{}{"serviceId": 7, "address": "0xabc"}}
+	resp := &fakeResp{}
+	r.rpcProcessContractUnsubscribe(nil, req, resp)
+	if resp.hasError {
+		t.Fatalf("unexpected error: %s", resp.errMsg)
+	}
+	if sub.unsubService != "7" || sub.unsubAddr != "0xabc" {
+		t.Fatalf("unsubscribe got %q %q", sub.unsubService, sub.unsubAddr)
+	}
+}
 ```
+
+Note: the fake `fakeReq.ParseParams` round-trips through JSON, so the numeric `7` decodes into the `int64 ServiceID` field exactly as the real request would.
 
 - [ ] **Step 3: Run tests to verify they fail**
 
@@ -735,10 +760,15 @@ func (r *BackRpc) rpcProcessContractList(ctx RequestContext, request RpcRequest,
 }
 
 // rpcProcessContractSubscribe subscribes a service to a contract's events.
-// params: {serviceId, address, scope (whole_contract|managed_only)}.
+// params: {serviceId (number), address, scope (whole_contract|managed_only)}.
+//
+// serviceId is a JSON number (the secured wrapper authenticates it via
+// GetParamInt and requires the subscriber to already exist). The eventlog layer
+// stores it as the decimal string form so the delivery sink can route to the
+// same subscriptions.Manager serviceId.
 func (r *BackRpc) rpcProcessContractSubscribe(ctx RequestContext, request RpcRequest, response RpcResponse) {
 	type params struct {
-		ServiceID string `json:"serviceId"`
+		ServiceID int64  `json:"serviceId"`
 		Address   string `json:"address"`
 		Scope     string `json:"scope"`
 	}
@@ -747,7 +777,7 @@ func (r *BackRpc) rpcProcessContractSubscribe(ctx RequestContext, request RpcReq
 		response.SetError(ERROR_CODE_PARSE_ERROR, ERROR_MESSAGE_PARSE_ERROR)
 		return
 	}
-	if p.ServiceID == "" || p.Address == "" {
+	if p.ServiceID == 0 || p.Address == "" {
 		response.SetError(ERROR_CODE_INVALID_REQUEST, "serviceId and address are required")
 		return
 	}
@@ -755,11 +785,40 @@ func (r *BackRpc) rpcProcessContractSubscribe(ctx RequestContext, request RpcReq
 		response.SetError(ERROR_CODE_SERVER_ERROR, "event subscriber not configured")
 		return
 	}
-	if err := r.eventLog.SubscribeAndSave(p.ServiceID, p.Address, p.Scope); err != nil {
+	serviceID := strconv.FormatInt(p.ServiceID, 10)
+	if err := r.eventLog.SubscribeAndSaveStrings(serviceID, p.Address, p.Scope); err != nil {
 		response.SetError(ERROR_CODE_INVALID_REQUEST, err.Error())
 		return
 	}
-	response.SetResult(map[string]string{"serviceId": p.ServiceID, "address": p.Address, "scope": p.Scope, "status": "subscribed"})
+	response.SetResult(map[string]interface{}{"serviceId": p.ServiceID, "address": p.Address, "scope": p.Scope, "status": "subscribed"})
+}
+
+// rpcProcessContractUnsubscribe removes a service's subscription to a contract.
+// params: {serviceId (number), address}.
+func (r *BackRpc) rpcProcessContractUnsubscribe(ctx RequestContext, request RpcRequest, response RpcResponse) {
+	type params struct {
+		ServiceID int64  `json:"serviceId"`
+		Address   string `json:"address"`
+	}
+	p := &params{}
+	if err := request.ParseParams(p); err != nil {
+		response.SetError(ERROR_CODE_PARSE_ERROR, ERROR_MESSAGE_PARSE_ERROR)
+		return
+	}
+	if p.ServiceID == 0 || p.Address == "" {
+		response.SetError(ERROR_CODE_INVALID_REQUEST, "serviceId and address are required")
+		return
+	}
+	if r.eventLog == nil {
+		response.SetError(ERROR_CODE_SERVER_ERROR, "event subscriber not configured")
+		return
+	}
+	serviceID := strconv.FormatInt(p.ServiceID, 10)
+	if err := r.eventLog.UnsubscribeStrings(serviceID, p.Address); err != nil {
+		response.SetError(ERROR_CODE_INVALID_REQUEST, err.Error())
+		return
+	}
+	response.SetResult(map[string]interface{}{"serviceId": p.ServiceID, "address": p.Address, "status": "unsubscribed"})
 }
 
 // rpcProcessContractListSubscriptions returns the active event subscriptions.
@@ -772,23 +831,45 @@ func (r *BackRpc) rpcProcessContractListSubscriptions(ctx RequestContext, reques
 }
 ```
 
+The new `strconv` import is needed — change the import block at the top of `endpoint/methods_contracts.go` from `import "errors"` to:
+
+```go
+import (
+	"errors"
+	"strconv"
+)
+```
+
 - [ ] **Step 5: Register the methods** — in `endpoint/rpc_init.go`, add to `InitProcessors()` (after the existing registrations):
 
 ```go
-	r.RegisterProcessor("contract.register", r.rpcProcessContractRegister)
-	r.RegisterProcessor("contractRegister", r.rpcProcessContractRegister)
+	// Write methods are SECURED (require serviceId + API token, like the other
+	// subscriber-mutating methods). read-only list methods are open.
+	r.RegisterSecuredProcessor("contract.register", r.rpcProcessContractRegister)
+	r.RegisterSecuredProcessor("contractRegister", r.rpcProcessContractRegister)
+	r.RegisterSecuredProcessor("contract.subscribe", r.rpcProcessContractSubscribe)
+	r.RegisterSecuredProcessor("contractSubscribe", r.rpcProcessContractSubscribe)
+	r.RegisterSecuredProcessor("contract.unsubscribe", r.rpcProcessContractUnsubscribe)
+	r.RegisterSecuredProcessor("contractUnsubscribe", r.rpcProcessContractUnsubscribe)
 	r.RegisterProcessor("contract.list", r.rpcProcessContractList)
 	r.RegisterProcessor("contractList", r.rpcProcessContractList)
-	r.RegisterProcessor("contract.subscribe", r.rpcProcessContractSubscribe)
-	r.RegisterProcessor("contractSubscribe", r.rpcProcessContractSubscribe)
 	r.RegisterProcessor("contract.subscriptions", r.rpcProcessContractListSubscriptions)
 	r.RegisterProcessor("contractSubscriptions", r.rpcProcessContractListSubscriptions)
 ```
 
+NOTE on the secured wrapper: `RegisterSecuredProcessor` reads `serviceId` via
+`GetParamInt("serviceId")` and looks the subscriber up in the subscriptions
+Manager BEFORE calling the processor — so the subscriber must already exist
+(created via the existing `service.register`/subscriber flow) and the request
+must carry its API token. The processor body still re-reads `serviceId` from
+params (as shown) to know whom to subscribe; the secured wrapper only
+authenticates. The unit tests above call the processor methods directly (not
+through the wrapper), so they exercise the handler logic without auth.
+
 - [ ] **Step 6: Run tests to verify they pass**
 
-Run: `go test ./endpoint/ -run 'TestContractRegister|TestContractList|TestContractSubscribe' -v`
-Expected: PASS (all four). Then `go build ./endpoint/` → exit 0.
+Run: `go test ./endpoint/ -run 'TestContractRegister|TestContractList|TestContractSubscribe|TestContractUnsubscribe' -v`
+Expected: PASS (all five). Then `go build ./endpoint/` → exit 0.
 
 - [ ] **Step 7: Commit**
 
@@ -1018,11 +1099,33 @@ func TestListSubscriptions(t *testing.T) {
 		}
 	}
 }
+
+func TestUnsubscribeStrings(t *testing.T) {
+	st := &memStore{}
+	svc := New(WithSubscriptionStorage(st))
+	_ = svc.SubscribeAndSaveStrings("7", "0xAA", "whole_contract")
+	_ = svc.SubscribeAndSaveStrings("8", "0xAA", "managed_only")
+	// Removing svc 7 must leave svc 8 on the same address.
+	if err := svc.UnsubscribeStrings("7", "0xAA"); err != nil {
+		t.Fatal(err)
+	}
+	subs := svc.subs.forAddress("0xaa")
+	if len(subs) != 1 || subs[0].ServiceID != "8" {
+		t.Fatalf("after unsubscribe subs=%+v", subs)
+	}
+	// Removing the last one clears the address entirely.
+	if err := svc.UnsubscribeStrings("8", "0xAA"); err != nil {
+		t.Fatal(err)
+	}
+	if len(svc.subs.forAddress("0xaa")) != 0 {
+		t.Fatal("address should have no subscriptions left")
+	}
+}
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `go test ./eventlog/ -run 'TestSubscribeAndSaveStrings|TestListSubscriptions' -v`
+Run: `go test ./eventlog/ -run 'TestSubscribeAndSaveStrings|TestListSubscriptions|TestUnsubscribeStrings' -v`
 Expected: FAIL — methods undefined.
 
 - [ ] **Step 3: Write minimal implementation** — create `eventlog/rpc_surface.go`:
@@ -1045,6 +1148,14 @@ func (s *Service) SubscribeAndSaveStrings(serviceID, contractAddress, scope stri
 	})
 }
 
+// UnsubscribeStrings removes the subscription for (serviceID, contractAddress)
+// and persists the new set. Removing a non-existent subscription is a no-op
+// (not an error) so the call is idempotent.
+func (s *Service) UnsubscribeStrings(serviceID, contractAddress string) error {
+	s.subs.remove(serviceID, contractAddress)
+	return s.saveSubscriptions()
+}
+
 // ListSubscriptions returns all subscriptions as string maps (serviceId,
 // address, scope) for RPC responses.
 func (s *Service) ListSubscriptions() []map[string]string {
@@ -1061,9 +1172,37 @@ func (s *Service) ListSubscriptions() []map[string]string {
 }
 ```
 
+Add the `remove` method to the subscription set. Append to `eventlog/subscriptions.go`:
+
+```go
+// remove drops the subscription matching (serviceID, contractAddress). If the
+// address has no subscriptions left, its map entry is deleted so addresses()
+// no longer reports it. A missing match is a no-op.
+func (s *subscriptionSet) remove(serviceID, contractAddress string) {
+	key := strings.ToLower(contractAddress)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	src := s.byAddr[key]
+	if len(src) == 0 {
+		return
+	}
+	kept := src[:0]
+	for _, sub := range src {
+		if sub.ServiceID != serviceID {
+			kept = append(kept, sub)
+		}
+	}
+	if len(kept) == 0 {
+		delete(s.byAddr, key)
+		return
+	}
+	s.byAddr[key] = kept
+}
+```
+
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `go test ./eventlog/ -run 'TestSubscribeAndSaveStrings|TestListSubscriptions' -v` then `go test ./eventlog/ -count=1`
+Run: `go test ./eventlog/ -run 'TestSubscribeAndSaveStrings|TestListSubscriptions|TestUnsubscribeStrings' -v` then `go test ./eventlog/ -count=1`
 Expected: PASS; full package `ok`.
 
 - [ ] **Step 5: Add an abi-manager adapter for ContractAdder** — the endpoint's `ContractAdder` expects `AddContractFromABI(name, symbol, address string, rawABI []byte) error`. `abi.SmartContractsManager` has `Add(*SmartContractInfo)` (no error) and `abi.NewContractFromABI(...) (*SmartContractInfo, error)`. Add a thin method to the abi manager. In a NEW file `abi/register.go`:
@@ -1187,7 +1326,7 @@ Expected: build 0; all three packages `ok`.
 - [ ] **Step 9: Commit**
 
 ```bash
-git add eventlog/rpc_surface.go eventlog/rpc_surface_test.go abi/register.go abi/register_test.go endpoint/contract_delivery.go subscriptions/notifysubscriber.go main.go
+git add eventlog/rpc_surface.go eventlog/rpc_surface_test.go eventlog/subscriptions.go abi/register.go abi/register_test.go endpoint/contract_delivery.go subscriptions/notifysubscriber.go main.go
 git commit -m "feat(m6): wire contractEvent delivery + contract RPC into main"
 ```
 
