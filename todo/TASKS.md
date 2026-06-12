@@ -258,7 +258,42 @@ See `docs/superpowers/plans/2026-06-12-m5-eventlog-service.md`.
       collector must support both filtering paths off the same decoded-log
       stream.
 
-## Milestone 6 — Delivery & API (`subscriptions/`, `endpoint/`)
+## Milestone 6 — Delivery & API (`subscriptions/`, `endpoint/`)  ✅ DONE
+
+**Status:** Complete. `contractEvent` is delivered to subscribers over the
+existing JSON-RPC callback mechanism: `eventlog.ContractEvent` now carries the
+matched subscription's `ServiceID`; `endpoint.NewContractEventSink` parses it
+back to the numeric serviceId and routes the event via
+`subscriptions.Manager.NotifySubscriberRaw` (a no-Signer sibling of
+`NotifySubscriber`). Delivery is extensible by design — a new event type is a
+new subject string + payload struct over the same `sendNotification` path, no
+dispatch-switch edit. New RPC methods (in `endpoint/methods_contracts.go` +
+`endpoint/methods_contract_call.go`, registered in `rpc_init.go`):
+`contract.register`/`contract.subscribe`/`contract.unsubscribe` (SECURED — write
+methods require serviceId + API token) and `contract.list`/
+`contract.subscriptions`/`contract.call` (open, read-only); both `dot.case` and
+`camelCase` aliases. The endpoint stays decoupled from the concrete
+abi/eventlog/ethclient types via narrow seams (`ContractRegistry`,
+`ContractAdder`, `EventSubscriber`, `ContractCaller`, `ContractEventNotifier`),
+wired in main.go. Registered contracts persist for free (the abi manager Saves
+on `Add`); eventlog subscriptions persist to `data/eventlog/subscriptions.json`
+and reload on startup (`LoadSubscriptions`), with concurrent saves serialized by
+a `saveMu`. Reorg `Removed` and `TransactionIndex` are threaded into the
+delivered payload. `contractCall` is no-arg in this first cut (totalSupply/
+decimals/etc.) — passing args returns a clear "not yet supported" error rather
+than mis-encoding. `go test ./eventlog/ ./endpoint/ ./abi/ -race` clean,
+`go build ./...` clean. See
+`docs/superpowers/plans/2026-06-12-m6-delivery-and-api.md`.
+
+> **Carry-over to M7 / future:**
+> - **Pre-existing `s.rpc` lazy-init race (NOT introduced by M6):** in
+>   `subscriptions/subscriptions.go`, `Subscription`'s `rpc` client is lazily
+>   initialized under only an RLock, so concurrent deliveries to the SAME
+>   subscriber can race. Predates M6 (the original `NotifySubscriber` already
+>   held only an RLock). Fix by guarding the lazy init or building `rpc` at
+>   subscribe time.
+> - **Receipts mode still not wired** (see M5 carry-over below); `contractCall`
+>   typed-argument encoding from JSON is a deliberate follow-up.
 
 > **Carry-over from M5 final review (for M6):**
 > - **Sink is concurrency-sensitive:** the watchdog dispatches block listeners
@@ -284,18 +319,20 @@ See `docs/superpowers/plans/2026-06-12-m5-eventlog-service.md`.
 > rewrite. Design `contractEvent` + the registration/subscription RPC surface
 > so new event types and presets plug in without touching the dispatch core.
 
-- [ ] **M6.1** New notification type `contractEvent` delivered to subscribers via
+- [x] **M6.1** New notification type `contractEvent` delivered to subscribers via
       the existing JSON-RPC 2.0 callback mechanism (alongside `blockEvent` /
-      `transactionEvent`). Make the notification dispatch table extensible so
-      future event types register rather than require new switch arms.
-- [ ] **M6.2** RPC methods: register a contract + ABI, list registered
+      `transactionEvent`). Dispatch is extensible: a new event type plugs in as a
+      new subject+payload over `sendNotification`, no switch-arm edit.
+- [x] **M6.2** RPC methods: register a contract + ABI, list registered
       contracts, subscribe to contract events with a `scope` param
-      (`whole_contract` | `managed_only`) per M5.7, list/unsubscribe. Register
-      via `AddRpcProcessor` following existing `methods_*.go` patterns.
-- [ ] **M6.3** Read-only RPC: `contractCall` to invoke a view method by
-      name+args and return decoded outputs.
-- [ ] **M6.4** Persist registered contracts/subscriptions in existing storage
-      (`data/abi/`, `data/subscriptions/`).
+      (`whole_contract` | `managed_only`) per M5.7, list AND unsubscribe.
+      Registered via `RegisterProcessor`/`RegisterSecuredProcessor` (write methods
+      secured) following existing `methods_*.go` patterns.
+- [x] **M6.3** Read-only RPC: `contractCall` to invoke a view method by
+      name and return decoded outputs (no-arg in this first cut; typed-arg
+      encoding from JSON is a documented follow-up).
+- [x] **M6.4** Persist registered contracts (abi manager Saves on `Add`) and
+      subscriptions (`data/eventlog/subscriptions.json`, reloaded on startup).
 
 ## Milestone 7 — Docs & tests
 
