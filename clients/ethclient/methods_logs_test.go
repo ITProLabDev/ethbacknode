@@ -99,3 +99,26 @@ func TestGetLogs_Empty(t *testing.T) {
 		t.Fatalf("want no logs, got %d", len(logs))
 	}
 }
+
+// jsonString wraps a raw JSON string value as a json.RawMessage result.
+func jsonString(hexResult string) json.RawMessage {
+	b, _ := json.Marshal(hexResult)
+	return b
+}
+
+// urpcClientWith builds a urpc.Client around a fake transport (test seam).
+func urpcClientWith(ft *fakeTransport) *urpc.Client {
+	return urpc.NewClientWithTransport(ft)
+}
+
+// memABIStore is an in-memory storage.BinStorage for the abi manager in tests.
+type memABIStore struct {
+	data   []byte
+	exists bool
+}
+
+func (s *memABIStore) IsExists() bool        { return s.exists }
+func (s *memABIStore) Save(b []byte) error   { s.data = append(s.data[:0], b...); s.exists = true; return nil }
+func (s *memABIStore) Load() ([]byte, error) { return s.data, nil }
+
+func newMemABIStorage() *memABIStore { return &memABIStore{} }
