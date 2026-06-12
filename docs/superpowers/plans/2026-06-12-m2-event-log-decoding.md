@@ -334,14 +334,18 @@ func (e *SmartContractAbiEntry) DecodeLog(topics [][32]byte, data []byte) (*Deco
 }
 
 // decodeIndexedTopic decodes a single indexed parameter from its 32-byte topic.
-// Static types are decoded normally; dynamic types are not recoverable and are
-// returned as a 32-byte hash placeholder.
+// Value types are decoded normally; reference types (arrays — fixed or dynamic —
+// tuples/structs, string, bytes) are stored as keccak256(value) in the topic per
+// the Solidity ABI spec and are returned as a 32-byte hash placeholder.
 func decodeIndexedTopic(in *SmartContractAbiEntryInput, topic [32]byte) (DecodedValue, error) {
 	typ, err := parseType(in.Type, in.Components)
 	if err != nil {
 		return DecodedValue{}, err
 	}
-	if typ.isDynamic() {
+	// NOTE: gating on isDynamic() alone is WRONG — a static array (uint256[2])
+	// or static tuple is still hashed when indexed. Gate on the kind instead.
+	switch typ.kind {
+	case kindArray, kindSlice, kindTuple, kindString, kindBytes:
 		hash := make([]byte, 32)
 		copy(hash, topic[:])
 		return DecodedValue{Type: typ.canonical() + " (indexed)", Value: hash}, nil
@@ -400,7 +404,7 @@ func TestEntryDecodeLog_IndexedDynamicPlaceholder(t *testing.T) {
 			{Name: "n", Type: "uint256"},
 		},
 	}
-	keyHash := mustHex32(t, "abce0f99c33fa8f7b0a5f7a3e2c9d2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b7c6d5e")
+	keyHash := mustHex32(t, "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899")
 	topics := [][32]byte{e.Topic0(), keyHash}
 	data := make([]byte, 32)
 	big.NewInt(7).FillBytes(data)
