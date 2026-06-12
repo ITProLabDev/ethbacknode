@@ -17,6 +17,7 @@ import (
 	"github.com/ITProLabDev/ethbacknode/clients/ethclient"
 	"github.com/ITProLabDev/ethbacknode/endpoint"
 	"github.com/ITProLabDev/ethbacknode/eventlog"
+	"github.com/ITProLabDev/ethbacknode/presets"
 	"github.com/ITProLabDev/ethbacknode/security"
 	"github.com/ITProLabDev/ethbacknode/storage"
 	"github.com/ITProLabDev/ethbacknode/subscriptions"
@@ -144,6 +145,17 @@ func main() {
 	log.Info("Blockchain Info:")
 	log.Info("- Chain Name:", chainClient.GetChainName())
 	log.Info("- Chain ID:", chainClient.GetChainId())
+	// Apply any built-in contract preset for this chain (PROJECT_STATUS §6).
+	// Matched on the numeric chainId from eth_chainId — the on-chain truth and
+	// the key the deployment artifact uses. Non-fatal: a node without the preset
+	// behaves as before. Idempotent: the registry dedups by address on restart.
+	if netId, nerr := chainClient.GetNetId(); nerr != nil {
+		log.Error("Can not read chain id for contract preset:", nerr)
+	} else if loaded, perr := presets.Apply(netId, abiManager); perr != nil {
+		log.Error("Can not apply contract preset:", perr)
+	} else if loaded > 0 {
+		log.Info("- Loaded contract preset:", loaded, "contracts")
+	}
 	for _, token := range chainClient.TokensList() {
 		log.Info("- Token:", token.Name, "(", token.Symbol, ")")
 	}
