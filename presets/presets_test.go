@@ -1,16 +1,14 @@
 package presets
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/ITProLabDev/ethbacknode/abi"
 )
 
-// fakeAdder records every contract handed to Add and can simulate a failure.
+// fakeAdder records every contract handed to Add.
 type fakeAdder struct {
-	added  []*abi.SmartContractInfo
-	failOn string // contract name to fail validation for (unused here)
+	added []*abi.SmartContractInfo
 }
 
 func (f *fakeAdder) Add(c *abi.SmartContractInfo) { f.added = append(f.added, c) }
@@ -58,5 +56,3 @@ func TestApply_UnknownChainRegistersNothing(t *testing.T) {
 		t.Fatalf("loaded=%d added=%d want 0/0", n, len(adder.added))
 	}
 }
-
-var _ = errors.New

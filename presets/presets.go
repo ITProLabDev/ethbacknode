@@ -24,7 +24,8 @@ type presetContract struct {
 	ABI      json.RawMessage `json:"abi"` // canonical Ethereum ABI array, verbatim
 }
 
-// bundle is the set of contracts deployed to one chain.
+// bundle is the set of contracts deployed to one chain. Source and GeneratedAt
+// are provenance metadata recorded in the file; they are not used at runtime.
 type bundle struct {
 	ChainID     int64            `json:"chainId"`
 	Source      string           `json:"source"`
