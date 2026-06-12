@@ -18,6 +18,9 @@ type jsonrpcEchoServer struct {
 	curConns int32
 	maxConns int32
 	wg       sync.WaitGroup
+
+	connMu sync.Mutex
+	conns  []net.Conn
 }
 
 func newJSONRPCEchoServer(t *testing.T, path string, delay time.Duration) *jsonrpcEchoServer {
@@ -34,11 +37,25 @@ func newJSONRPCEchoServer(t *testing.T, path string, delay time.Duration) *jsonr
 			if err != nil {
 				return
 			}
+			s.connMu.Lock()
+			s.conns = append(s.conns, conn)
+			s.connMu.Unlock()
 			s.wg.Add(1)
 			go s.serve(conn)
 		}
 	}()
-	t.Cleanup(func() { _ = ln.Close(); s.wg.Wait() })
+	// Cleanup must close the listener AND every accepted connection: the pool
+	// keeps connections open for reuse, so serve()'s blocking Decode only
+	// returns once its conn is closed. Without this, wg.Wait() deadlocks.
+	t.Cleanup(func() {
+		_ = ln.Close()
+		s.connMu.Lock()
+		for _, c := range s.conns {
+			_ = c.Close()
+		}
+		s.connMu.Unlock()
+		s.wg.Wait()
+	})
 	return s
 }
 

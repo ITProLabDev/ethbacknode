@@ -20,6 +20,9 @@ type echoServer struct {
 	maxConns      int32
 	totalAccepted int32
 	connWg        sync.WaitGroup
+
+	connMu sync.Mutex
+	conns  []net.Conn
 }
 
 func newEchoServer(t *testing.T, path string, delay time.Duration) *echoServer {
@@ -30,7 +33,18 @@ func newEchoServer(t *testing.T, path string, delay time.Duration) *echoServer {
 	}
 	s := &echoServer{ln: ln, delay: delay}
 	go s.acceptLoop()
-	t.Cleanup(func() { _ = s.ln.Close(); s.connWg.Wait() })
+	// Cleanup must close the listener AND every accepted connection: the pool
+	// keeps connections open for reuse, so handle()'s blocking Decode only
+	// returns once its conn is closed. Without this, connWg.Wait() deadlocks.
+	t.Cleanup(func() {
+		_ = s.ln.Close()
+		s.connMu.Lock()
+		for _, c := range s.conns {
+			_ = c.Close()
+		}
+		s.connMu.Unlock()
+		s.connWg.Wait()
+	})
 	return s
 }
 
@@ -40,6 +54,9 @@ func (s *echoServer) acceptLoop() {
 		if err != nil {
 			return
 		}
+		s.connMu.Lock()
+		s.conns = append(s.conns, conn)
+		s.connMu.Unlock()
 		s.connWg.Add(1)
 		go s.handle(conn)
 	}
