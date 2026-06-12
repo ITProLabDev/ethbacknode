@@ -84,9 +84,21 @@ bounds. `go test ./abi/ -race` clean (49 tests), `go build ./...` and
       (encode↔decode round-trips, oversized/short input must error not panic —
       follow the existing `abi_test.go` style).
 
-## Milestone 2 — ABI engine: event-log decoding (`abi/`)
+## Milestone 2 — ABI engine: event-log decoding (`abi/`)  ✅ DONE
 
-> **Carry-over notes from the M1 final review (apply during M2):**
+**Status:** Complete. `abi/event.go` adds `Topic0()` (full 32-byte event
+signature hash), `(*SmartContractAbiEntry).DecodeLog(topics [][32]byte, data
+[]byte)` (splits indexed params from `topics[1:]` and non-indexed from `data`;
+indexed reference types — arrays/tuples/string/bytes — return a 32-byte keccak
+hash placeholder per the Solidity spec), `(*SmartContractAbi).GetEventByTopic0`,
+and `(*SmartContractsManager).DecodeLog(contractAddress, topics, data)`.
+Validated against real mainnet topic0 vectors (ERC-20 `Transfer`, ERC-1155
+`TransferSingle`) and ERC-1155 `TransferBatch` decode. `go test ./abi/ -race`
+clean, `go build ./...` and `go vet ./abi/` clean. Carry-over perf note (cached
+topic0 map) recorded under Milestone 5. See
+`docs/superpowers/plans/2026-06-12-m2-event-log-decoding.md`.
+
+> **Carry-over notes from the M1 final review (applied during M2):**
 > - **Indexed dynamic params** (e.g. `string`/`bytes`/arrays marked `indexed`)
 >   appear in topics as their Keccak hash, NOT the original value — they are not
 >   recoverable. Do NOT blindly reuse `decodeParams` for indexed args; decode
@@ -101,14 +113,14 @@ bounds. `go test ./abi/ -race` clean (49 tests), `go build ./...` and
 >   for array/slice kinds or add a nil guard — `isDynamic()`/`staticSize()`
 >   deref `t.elem`.
 
-- [ ] **M2.1** Implement event topic0 hashing: 32-byte
+- [x] **M2.1** Implement event topic0 hashing: 32-byte
       `keccak256("EventName(type1,type2,...)")` (vs the 4-byte method selector).
       Extend `updateSignature` with an event branch.
-- [ ] **M2.2** `DecodeLog(topics [][]byte, data []byte) (*DecodedEvent, error)`
+- [x] **M2.2** `DecodeLog(topics [][]byte, data []byte) (*DecodedEvent, error)`
       on `SmartContractAbi`: split `indexed` params from `topics[1:]` and
       non-indexed params from `data`. Handle `anonymous` events (no topic0).
-- [ ] **M2.3** Registry lookup `GetEventByTopic0([32]byte) (*SmartContractAbiEntry, error)`.
-- [ ] **M2.4** Unit tests with real ERC-1155 `TransferSingle`/`TransferBatch`
+- [x] **M2.3** Registry lookup `GetEventByTopic0([32]byte) (*SmartContractAbiEntry, error)`.
+- [x] **M2.4** Unit tests with real ERC-1155 `TransferSingle`/`TransferBatch`
       and CTF `PositionSplit` / `ConditionResolution` log fixtures.
 
 ## Milestone 3 — Standard ABI import & generalized registry (`abi/`)
@@ -137,6 +149,13 @@ bounds. `go test ./abi/ -race` clean (49 tests), `go build ./...` and
 - [ ] **M4.4** Tests against recorded JSON-RPC fixtures (IPC/HTTP).
 
 ## Milestone 5 — Event-log service (`eventlog/`, new package)
+
+> **Carry-over from M2 review (perf, apply when log volume matters):**
+> `(*SmartContractAbi).GetEventByTopic0` is O(entries) per log and recomputes
+> `Topic0()` (keccak) for every entry on every call. For high-volume log
+> decoding (Mode A/B), build a cached `map[[32]byte]*SmartContractAbiEntry` in
+> `_prepare()` and look up by topic0 in O(1). Not needed for correctness; only
+> if profiling shows it hot.
 
 - [ ] **M5.1** New package `eventlog/` (Approach A): consumes a chain client +
       the ABI registry, decodes logs into `DecodedEvent`, and exposes a
