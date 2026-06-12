@@ -205,6 +205,7 @@ func main() {
 
 	// Event-log service: decode registered contracts' events per block and
 	// deliver them. Wired as a watchdog block listener (Approach A).
+	eventlogStorage := storageManager.GetModuleStorage("EventLog", "eventlog")
 	eventLogService := eventlog.New(
 		eventlog.WithLogSource(eventlog.RawLogSource{
 			GetLogsFn: func(fromBlock, toBlock int64, addresses, topics []string) ([]eventlog.RawLog, error) {
@@ -243,7 +244,7 @@ func main() {
 		eventlog.WithDecoder(eventlog.NewDecoder(abiManager.DecodeLog)),
 		eventlog.WithManaged(addressManager),
 		eventlog.WithAddressCodec(addressCodec),
-		eventlog.WithSubscriptionStorage(storageManager.GetModuleStorage("EventLog", "eventlog").GetBinFileStorage("subscriptions.json")),
+		eventlog.WithSubscriptionStorage(eventlogStorage.GetBinFileStorage("subscriptions.json")),
 		eventlog.WithSink(endpoint.NewContractEventSink(
 			endpoint.NotifierFunc(func(serviceID int64, subject string, payload interface{}) {
 				subscriptionsManager.NotifySubscriberRaw(subscriptions.ServiceId(serviceID), subject, payload)
