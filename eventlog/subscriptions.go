@@ -1,0 +1,86 @@
+// Package eventlog collects, decodes, and scope-filters smart-contract event
+// logs per block, handing decoded events to a delivery sink. It plugs into the
+// watchdog as a block listener and keeps the abi/ engine a pure library.
+package eventlog
+
+import (
+	"fmt"
+	"strings"
+	"sync"
+)
+
+// Scope selects which of a contract's events a subscription receives.
+type Scope int
+
+const (
+	// ScopeWholeContract delivers every event of the contract, regardless of
+	// which addresses are involved.
+	ScopeWholeContract Scope = iota
+	// ScopeManagedOnly delivers only events that involve a managed address
+	// (matched inside the event's address-typed parameters).
+	ScopeManagedOnly
+)
+
+// ParseScope parses a scope name (case-insensitive): "whole_contract" or
+// "managed_only".
+func ParseScope(s string) (Scope, error) {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "whole_contract":
+		return ScopeWholeContract, nil
+	case "managed_only":
+		return ScopeManagedOnly, nil
+	default:
+		return 0, fmt.Errorf("unknown event scope %q (want whole_contract | managed_only)", s)
+	}
+}
+
+// Subscription is an in-memory contract-event subscription. ServiceID
+// identifies the subscriber (for M6 delivery); ContractAddress is the contract
+// whose events are wanted; Scope selects the filtering mode.
+type Subscription struct {
+	ServiceID       string
+	ContractAddress string
+	Scope           Scope
+}
+
+// subscriptionSet is a concurrency-safe in-memory set of subscriptions keyed by
+// lowercased contract address.
+type subscriptionSet struct {
+	mu     sync.RWMutex
+	byAddr map[string][]*Subscription
+}
+
+func newSubscriptionSet() *subscriptionSet {
+	return &subscriptionSet{byAddr: make(map[string][]*Subscription)}
+}
+
+func (s *subscriptionSet) add(sub *Subscription) {
+	key := strings.ToLower(sub.ContractAddress)
+	s.mu.Lock()
+	s.byAddr[key] = append(s.byAddr[key], sub)
+	s.mu.Unlock()
+}
+
+// forAddress returns the subscriptions registered for a contract address
+// (case-insensitive). The returned slice is a copy safe to read concurrently.
+func (s *subscriptionSet) forAddress(addr string) []*Subscription {
+	key := strings.ToLower(addr)
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	src := s.byAddr[key]
+	out := make([]*Subscription, len(src))
+	copy(out, src)
+	return out
+}
+
+// addresses returns the unique (lowercased) contract addresses with at least
+// one subscription — used to build the eth_getLogs address filter.
+func (s *subscriptionSet) addresses() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]string, 0, len(s.byAddr))
+	for addr := range s.byAddr {
+		out = append(out, addr)
+	}
+	return out
+}
