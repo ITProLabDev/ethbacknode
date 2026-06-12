@@ -6,6 +6,7 @@ import "github.com/ITProLabDev/ethbacknode/abi"
 // for delivery. It is the unit handed to a Sink.
 type ContractEvent struct {
 	Event            *abi.DecodedEvent // decoded event (name, contract, inputs)
+	ServiceID        string            // the matched subscription's subscriber ID
 	BlockNumber      int64
 	TransactionHash  string
 	TransactionIndex int64

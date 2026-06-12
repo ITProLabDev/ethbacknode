@@ -143,6 +143,7 @@ func (s *Service) decodeAndDeliver(lg *ethLog) {
 		if eventMatchesScope(ev, sub.Scope, s.managed, s.codec) {
 			s.sink(&ContractEvent{
 				Event:            ev,
+				ServiceID:        sub.ServiceID,
 				BlockNumber:      lg.BlockNumber,
 				TransactionHash:  lg.TransactionHash,
 				TransactionIndex: lg.TransactionIndex,

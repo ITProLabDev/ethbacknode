@@ -91,3 +91,35 @@ func TestService_OnBlock_NoSubscriptions_NoCalls(t *testing.T) {
 		t.Fatal("with no subscriptions, GetLogs must not be called")
 	}
 }
+
+func TestService_OnBlock_SetsServiceIDPerSubscription(t *testing.T) {
+	addr := "0xabc0000000000000000000000000000000000001"
+	src := &fakeLogSource{logs: []*ethLog{
+		{Address: addr, Topics: []string{topicHex(0xaa)}, BlockNumber: 1, LogIndex: 0, TransactionHash: "0xtx"},
+	}}
+	dec := &fakeDecoder{events: map[string]*abi.DecodedEvent{
+		addr: {Name: "E", Contract: addr},
+	}}
+	var mu sync.Mutex
+	var ids []string
+	sink := func(ce *ContractEvent) { mu.Lock(); ids = append(ids, ce.ServiceID); mu.Unlock() }
+
+	svc := New(WithLogSource(src), WithDecoder(dec),
+		WithManaged(stubManaged{known: map[string]bool{}}), WithAddressCodec(stubCodec{}),
+		WithSink(sink), WithConfig(DefaultConfig()))
+	svc.Subscribe(&Subscription{ServiceID: "svcA", ContractAddress: addr, Scope: ScopeWholeContract})
+	svc.Subscribe(&Subscription{ServiceID: "svcB", ContractAddress: addr, Scope: ScopeWholeContract})
+
+	svc.OnBlock(1, "0xb")
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(ids) != 2 {
+		t.Fatalf("delivered %d want 2", len(ids))
+	}
+	// Each subscriber must receive an event tagged with its own ServiceID.
+	seen := map[string]bool{ids[0]: true, ids[1]: true}
+	if !seen["svcA"] || !seen["svcB"] {
+		t.Fatalf("serviceIDs=%v want svcA+svcB", ids)
+	}
+}
