@@ -165,7 +165,20 @@ detect/decode, project template import). `go test ./abi/ -race` clean,
 - [x] **M3.4** Backward-compat: existing `known_contracts.json` and ERC-20
       template must still load. Tests.
 
-## Milestone 4 — Client: receipts & logs (`clients/ethclient/`)
+## Milestone 4 — Client: receipts & logs (`clients/ethclient/`)  ✅ DONE
+
+**Status:** Complete. `clients/ethclient/types_receipt.go` adds `Log` and
+`Receipt` types (proxy-map 0x-hex `UnmarshalJSON`, nested logs, `Log.Topics32()`
+bridge to `[][32]byte`, `Receipt.Success()`). `methods.go` adds
+`GetTransactionReceipt` (null → `ErrTransactionNotFound`) and `eth_getLogs` via
+`GetLogs(LogFilter)`. `abi/output.go` adds `(*SmartContractAbiEntry).DecodeOutputs`
+(decode `eth_call` return data by a method's outputs). `call_method.go` adds the
+generic `(*Client).CallMethod(contract, method, args...) ([]abi.DecodedValue, error)`
+— look up registered contract → encode call-data → `eth_call` → decode outputs,
+tying M1–M5 together. A `urpc.NewClientWithTransport` test seam enables
+node-free RPC tests. `go test -race` (ethclient/urpc/abi) clean, `go build ./...`
+and `go vet` clean. Tuple OUTPUT decoding remains deferred (output model has no
+components). See `docs/superpowers/plans/2026-06-12-m4-client-receipts-logs.md`.
 
 > **Carry-over from M3 final review (for M4/M5/M6):**
 > - **Tuple OUTPUT decoding is deferred.** `ImportEthereumABI` currently rejects
@@ -183,15 +196,15 @@ detect/decode, project template import). `go test ./abi/ -race` clean,
 >   `ImportEthereumABI`/`NewContractFromABI` + registry cold-start — never as
 >   hardcoded Go logic. The importer is ready for it.
 
-- [ ] **M4.1** Implement `GetTransactionReceipt(txHash) (*Receipt, error)`
+- [x] **M4.1** Implement `GetTransactionReceipt(txHash) (*Receipt, error)`
       (the const already exists; the method does not). Add `Receipt`/`Log` Go
       types with the project's hex-decoding `UnmarshalJSON` style.
-- [ ] **M4.2** Implement `eth_getLogs`: `GetLogs(filter LogFilter) ([]*Log, error)`
+- [x] **M4.2** Implement `eth_getLogs`: `GetLogs(filter LogFilter) ([]*Log, error)`
       with fromBlock/toBlock, address list, topics.
-- [ ] **M4.3** Generalize `eth_call`-based reads: a `CallMethod(contract,
+- [x] **M4.3** Generalize `eth_call`-based reads: a `CallMethod(contract,
       method, args...) ([]DecodedValue, error)` helper using the ABI engine
       (e.g. ERC-1155 `balanceOf(addr,id)`, `balanceOfBatch`).
-- [ ] **M4.4** Tests against recorded JSON-RPC fixtures (IPC/HTTP).
+- [x] **M4.4** Tests against recorded JSON-RPC fixtures (IPC/HTTP).
 
 ## Milestone 5 — Event-log service (`eventlog/`, new package)
 
