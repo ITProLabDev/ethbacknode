@@ -123,6 +123,17 @@ topic0 map) recorded under Milestone 5. See
 - [x] **M2.4** Unit tests with real ERC-1155 `TransferSingle`/`TransferBatch`
       and CTF `PositionSplit` / `ConditionResolution` log fixtures.
 
+> **Carry-over from M2 final review (for M3/M4/M5):**
+> - **Anonymous events** are unsupported (no `anonymous` field in the model);
+>   they fail closed to `ErrUnknownEvent`. If a target contract uses anonymous
+>   events, add an `anonymous` field + an alternate decode path (indexed params
+>   start at `topics[0]`, no signature topic).
+> - The indexed-reference placeholder `Type` string (`"… (indexed)"`) is
+>   display-only and NOT re-parseable — do not feed it back into `parseType`.
+> - Decode is concurrency-safe today; `_prepare`/`sync.Once` writes `Signature`
+>   on first call — keep any future per-entry caching behind the same `Once`
+>   (or read-only post-prepare) to stay race-free under watchdog fan-out.
+
 ## Milestone 3 — Standard ABI import & generalized registry (`abi/`)
 
 - [ ] **M3.1** `abi/import.go`: `ImportEthereumABI(raw []byte) (*SmartContractAbi, error)`
