@@ -243,14 +243,37 @@ async Badger init in a unit test; the codec — the actual source of the invaria
 
 ---
 
-## 6. Pending product request (not yet started)
+## 6. Built-in contract preset — ✅ DELIVERED (2026-06-13)
 
-**Built-in contract preset (user, 2026-06-12):** the user will provide a specific
-contract to integrate as a built-in preset. It must be integrated via import
-path / ABI data (the existing `AddContractFromABI` registration flow), **NOT**
-hardcoded Go. When it arrives: register its ABI as a preset loaded at startup,
-and it automatically gains contractEvent delivery + contractCall + subscription
-RPC. (Memory: `contract-preset-pending`.)
+**Built-in contract preset (user, 2026-06-12; delivered 2026-06-13).** The user
+supplied a Polymarket-class prediction-market deployment
+(`_sources/contracts/deployments/arc.json`, Circle Arc testnet, chainId 5042002,
+8 contracts). Integrated via ABI data through the registration flow, **NOT**
+hardcoded Go:
+
+- **`presets/arc.json`** (new, `git add -f` — `data/`/`_sources/` are gitignored):
+  a version-controlled bundle `[{chainId, source, generatedAt, contracts:[{name,
+  symbol, decimals, address, abi:[<canonical ABI>]}×8]}]`, generated once from the
+  artifact. The 8 contracts: JustifyAccessControl, MockUSDC (decimals 6),
+  OutcomeToken, FeeTreasury, OracleResolver, MarketFactory, PredictionMarket,
+  MarketAMM. None have tuple in/out, so all import cleanly.
+- **`presets/` package** (new): `//go:embed arc.json` + `Apply(chainID int64,
+  adder ContractAdder) (loaded int, err error)` — registers every preset contract
+  whose bundle `chainId` matches, via `abi.NewContractFromABI` (validates ABI) +
+  `Add` (carries `decimals`). Narrow `ContractAdder` interface, satisfied by
+  `*abi.SmartContractsManager`.
+- **`main.go` wiring:** after `chainClient.Init()`, the numeric chainId is read
+  via `chainClient.GetNetId()` (`eth_chainId`) — the on-chain truth and the
+  artifact's key (`GetChainId()` returns the logical label `"arc-testnet"`, not
+  the number) — then `presets.Apply(netId, abiManager)`. **Non-fatal** (logs on
+  error, node still starts), **idempotent** (registry dedups by address),
+  **chain-isolated** (Arc preset never loads on an Eth node).
+
+Each preset contract automatically gains `contractEvent` delivery, `contractCall`,
+and event subscriptions — no per-contract Go logic. Embedded → survives cold-start
+and ships with the binary (unlike the gitignored runtime `known_contracts.json`).
+Plan: `docs/superpowers/plans/2026-06-13-arc-contract-preset.md`; design:
+`docs/superpowers/specs/2026-06-13-arc-contract-preset-design.md`.
 
 ---
 
