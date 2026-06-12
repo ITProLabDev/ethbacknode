@@ -1,7 +1,9 @@
 package abi
 
 import (
+	"bytes"
 	"encoding/hex"
+	"math/big"
 	"strings"
 	"testing"
 )
@@ -52,5 +54,100 @@ func TestTopic0_Erc1155TransferSingle(t *testing.T) {
 	want := mustHex32(t, "c3d58168c5ae7397731d063d5bbf3d657854427343f4c083240f7aacaa2d0f62")
 	if got != want {
 		t.Fatalf("topic0=%x want %x", got, want)
+	}
+}
+
+func TestEntryDecodeLog_Erc20Transfer(t *testing.T) {
+	e := &SmartContractAbiEntry{
+		Name: "Transfer",
+		Type: "Event",
+		Inputs: []*SmartContractAbiEntryInput{
+			{Name: "from", Type: "address", Indexed: true},
+			{Name: "to", Type: "address", Indexed: true},
+			{Name: "value", Type: "uint256"},
+		},
+	}
+	from := mustHex32(t, "000000000000000000000000"+"1111111111111111111111111111111111111111")
+	to := mustHex32(t, "000000000000000000000000"+"2222222222222222222222222222222222222222")
+	topics := [][32]byte{e.Topic0(), from, to}
+	// data = the non-indexed uint256 value = 1000
+	data := make([]byte, 32)
+	big.NewInt(1000).FillBytes(data)
+
+	ev, err := e.DecodeLog(topics, data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ev.Name != "Transfer" || len(ev.Inputs) != 3 {
+		t.Fatalf("event=%+v", ev)
+	}
+	// indexed addresses decoded to 20-byte []byte
+	wantFrom, _ := hex.DecodeString("1111111111111111111111111111111111111111")
+	if !bytes.Equal(ev.Inputs[0].Value.([]byte), wantFrom) {
+		t.Fatalf("from=%x", ev.Inputs[0].Value)
+	}
+	if ev.Inputs[0].Name != "from" {
+		t.Fatalf("name=%q", ev.Inputs[0].Name)
+	}
+	// non-indexed value decoded from data
+	if ev.Inputs[2].Value.(*big.Int).Int64() != 1000 {
+		t.Fatalf("value=%v", ev.Inputs[2].Value)
+	}
+}
+
+func TestEntryDecodeLog_RejectsNonEvent(t *testing.T) {
+	e := &SmartContractAbiEntry{Name: "transfer", Type: "Function"}
+	if _, err := e.DecodeLog(nil, nil); err == nil {
+		t.Fatal("non-event must be rejected")
+	}
+}
+
+func TestEntryDecodeLog_RejectsTopicCountMismatch(t *testing.T) {
+	e := &SmartContractAbiEntry{
+		Name: "Transfer",
+		Type: "Event",
+		Inputs: []*SmartContractAbiEntryInput{
+			{Name: "from", Type: "address", Indexed: true},
+			{Name: "to", Type: "address", Indexed: true},
+			{Name: "value", Type: "uint256"},
+		},
+	}
+	// only 1 topic past topic0, but 2 indexed params expected
+	topics := [][32]byte{e.Topic0(), mustHex32(t, strings.Repeat("00", 32))}
+	if _, err := e.DecodeLog(topics, nil); err == nil {
+		t.Fatal("topic count mismatch must be rejected")
+	}
+}
+
+func TestEntryDecodeLog_IndexedStaticArrayIsHashed(t *testing.T) {
+	// An indexed uint256[2] is a STATIC type but, per the Solidity spec, all
+	// indexed arrays are stored as keccak256(value) — so decoding must yield a
+	// 32-byte hash placeholder, never an error or a wrongly-decoded value.
+	e := &SmartContractAbiEntry{
+		Name: "Arr",
+		Type: "Event",
+		Inputs: []*SmartContractAbiEntryInput{
+			{Name: "pair", Type: "uint256[2]", Indexed: true},
+			{Name: "n", Type: "uint256"},
+		},
+	}
+	pairHash := mustHex32(t, "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef")
+	topics := [][32]byte{e.Topic0(), pairHash}
+	data := make([]byte, 32)
+	big.NewInt(9).FillBytes(data)
+
+	ev, err := e.DecodeLog(topics, data)
+	if err != nil {
+		t.Fatalf("indexed static array must decode to a hash placeholder, got err: %v", err)
+	}
+	hash, ok := ev.Inputs[0].Value.([]byte)
+	if !ok || len(hash) != 32 || !bytes.Equal(hash, pairHash[:]) {
+		t.Fatalf("pair must be 32-byte hash placeholder, got %T %v", ev.Inputs[0].Value, ev.Inputs[0].Value)
+	}
+	if !strings.Contains(ev.Inputs[0].Type, "indexed") {
+		t.Fatalf("type should mark indexed: %q", ev.Inputs[0].Type)
+	}
+	if ev.Inputs[1].Value.(*big.Int).Int64() != 9 {
+		t.Fatalf("n=%v", ev.Inputs[1].Value)
 	}
 }
