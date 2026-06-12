@@ -2,6 +2,7 @@ package endpoint
 
 import (
 	"math/big"
+	"strings"
 	"testing"
 
 	"github.com/ITProLabDev/ethbacknode/abi"
@@ -56,5 +57,20 @@ func TestContractCall_RequiresAddressAndMethod(t *testing.T) {
 	r.rpcProcessContractCall(nil, &fakeReq{params: map[string]interface{}{"address": "0xabc"}}, resp)
 	if !resp.hasError {
 		t.Fatal("missing method must error")
+	}
+}
+
+func TestContractCall_RejectsArgs(t *testing.T) {
+	r := &BackRpc{contractCaller: &fakeCaller{}}
+	req := &fakeReq{params: map[string]interface{}{
+		"address": "0xabc", "method": "transfer", "args": []interface{}{"0xdef", 100},
+	}}
+	resp := &fakeResp{}
+	r.rpcProcessContractCall(nil, req, resp)
+	if !resp.hasError {
+		t.Fatal("args not yet supported must error")
+	}
+	if !strings.Contains(resp.errMsg, "not yet supported") {
+		t.Fatalf("expected args error, got: %s", resp.errMsg)
 	}
 }
