@@ -24,12 +24,14 @@ func NewDecoder(fn func(contractAddress string, topics [][32]byte, data []byte) 
 // converts clients/ethclient.Log values into RawLog so eventlog stays free of
 // an ethclient import.
 type RawLog struct {
-	Address         string
-	Topics          []string
-	Data            []byte
-	BlockNumber     int64
-	TransactionHash string
-	LogIndex        int64
+	Address          string
+	Topics           []string
+	Data             []byte
+	BlockNumber      int64
+	TransactionHash  string
+	TransactionIndex int64
+	LogIndex         int64
+	Removed          bool
 }
 
 // RawLogSource adapts ethclient-shaped functions to the eventlog LogSource
@@ -65,12 +67,14 @@ func rawToEthLogs(raw []RawLog) []*ethLog {
 	out := make([]*ethLog, len(raw))
 	for i, l := range raw {
 		out[i] = &ethLog{
-			Address:         l.Address,
-			Topics:          l.Topics,
-			Data:            l.Data,
-			BlockNumber:     l.BlockNumber,
-			TransactionHash: l.TransactionHash,
-			LogIndex:        l.LogIndex,
+			Address:          l.Address,
+			Topics:           l.Topics,
+			Data:             l.Data,
+			BlockNumber:      l.BlockNumber,
+			TransactionHash:  l.TransactionHash,
+			TransactionIndex: l.TransactionIndex,
+			LogIndex:         l.LogIndex,
+			Removed:          l.Removed,
 		}
 	}
 	return out

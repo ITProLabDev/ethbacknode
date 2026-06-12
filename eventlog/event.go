@@ -5,10 +5,13 @@ import "github.com/ITProLabDev/ethbacknode/abi"
 // ContractEvent is a decoded contract event plus the block/tx context needed
 // for delivery. It is the unit handed to a Sink.
 type ContractEvent struct {
-	Event           *abi.DecodedEvent // decoded event (name, contract, inputs)
-	BlockNumber     int64
-	TransactionHash string
-	LogIndex        int64
+	Event            *abi.DecodedEvent // decoded event (name, contract, inputs)
+	BlockNumber      int64
+	TransactionHash  string
+	TransactionIndex int64
+	LogIndex         int64
+	// Removed is true if the source log was reverted by a chain reorg.
+	Removed bool
 }
 
 // ManagedAddresses is the subset of address.Manager that eventlog needs to

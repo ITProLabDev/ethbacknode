@@ -218,7 +218,8 @@ func main() {
 				for i, l := range logs {
 					out[i] = eventlog.RawLog{
 						Address: l.Address, Topics: l.Topics, Data: l.Data,
-						BlockNumber: l.BlockNumber, TransactionHash: l.TransactionHash, LogIndex: l.LogIndex,
+						BlockNumber: l.BlockNumber, TransactionHash: l.TransactionHash,
+						TransactionIndex: l.TransactionIndex, LogIndex: l.LogIndex, Removed: l.Removed,
 					}
 				}
 				return out, nil
@@ -232,7 +233,8 @@ func main() {
 				for i, l := range r.Logs {
 					out[i] = eventlog.RawLog{
 						Address: l.Address, Topics: l.Topics, Data: l.Data,
-						BlockNumber: l.BlockNumber, TransactionHash: l.TransactionHash, LogIndex: l.LogIndex,
+						BlockNumber: l.BlockNumber, TransactionHash: l.TransactionHash,
+						TransactionIndex: l.TransactionIndex, LogIndex: l.LogIndex, Removed: l.Removed,
 					}
 				}
 				return out, nil

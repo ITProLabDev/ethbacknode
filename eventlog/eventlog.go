@@ -13,12 +13,16 @@ var errNoEvent = errors.New("no matching event")
 // ethLog is the minimal log shape eventlog needs. It mirrors
 // clients/ethclient.Log; the adapter in main.go converts between them.
 type ethLog struct {
-	Address         string
-	Topics          []string
-	Data            []byte
-	BlockNumber     int64
-	TransactionHash string
-	LogIndex        int64
+	Address          string
+	Topics           []string
+	Data             []byte
+	BlockNumber      int64
+	TransactionHash  string
+	TransactionIndex int64
+	LogIndex         int64
+	// Removed is true if the log was reverted by a chain reorg. Carried through
+	// so M6 delivery can distinguish reverted events from canonical ones.
+	Removed bool
 }
 
 // topics32 converts the 0x-hex topics to [32]byte for the decoder.
@@ -61,6 +65,9 @@ type Decoder interface {
 }
 
 // Sink receives decoded, scope-filtered contract events for delivery (M6).
+// It may be called concurrently from multiple goroutines (the watchdog
+// dispatches block listeners in their own goroutines), so implementations
+// must be safe for concurrent use.
 type Sink func(*ContractEvent)
 
 // Service collects, decodes, and scope-filters contract event logs per block.
@@ -135,10 +142,12 @@ func (s *Service) decodeAndDeliver(lg *ethLog) {
 	for _, sub := range subs {
 		if eventMatchesScope(ev, sub.Scope, s.managed, s.codec) {
 			s.sink(&ContractEvent{
-				Event:           ev,
-				BlockNumber:     lg.BlockNumber,
-				TransactionHash: lg.TransactionHash,
-				LogIndex:        lg.LogIndex,
+				Event:            ev,
+				BlockNumber:      lg.BlockNumber,
+				TransactionHash:  lg.TransactionHash,
+				TransactionIndex: lg.TransactionIndex,
+				LogIndex:         lg.LogIndex,
+				Removed:          lg.Removed,
 			})
 		}
 	}
