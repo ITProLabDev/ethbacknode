@@ -2,6 +2,7 @@ package abi
 
 import (
 	"math/big"
+	"os"
 	"testing"
 )
 
@@ -171,5 +172,58 @@ func TestRegistry_ArbitraryContractRoundTrip(t *testing.T) {
 	}
 	if decoded.Inputs[4].Value.(*big.Int).Int64() != 9 {
 		t.Fatalf("value=%v", decoded.Inputs[4].Value)
+	}
+}
+
+func TestImport_GenericContractClassFixtures(t *testing.T) {
+	// Multi-token (ERC-1155) role: dynamic-array methods + transfer events.
+	mt, err := os.ReadFile("testdata/multitoken_erc1155.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, err := ImportEthereumABI(mt)
+	if err != nil {
+		t.Fatalf("multitoken import: %v", err)
+	}
+	if _, err := a.GetMethodByName("balanceOfBatch"); err != nil {
+		t.Fatal(err)
+	}
+	// TransferSingle event imported with the real mainnet ERC-1155 topic0.
+	if _, err := a.GetEventByTopic0(mustHex32(t, "c3d58168c5ae7397731d063d5bbf3d657854427343f4c083240f7aacaa2d0f62")); err != nil {
+		t.Fatalf("TransferSingle topic0 not found: %v", err)
+	}
+
+	// Outcome-market role: bytes32 ids + dynamic arrays + indexed bytes32.
+	om, err := os.ReadFile("testdata/outcome_market.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	oa, err := ImportEthereumABI(om)
+	if err != nil {
+		t.Fatalf("outcome_market import: %v", err)
+	}
+	if _, err := oa.GetMethodByName("splitPosition"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := oa.GetMethodByName("PositionSplit"); err != nil { // GetMethodByName matches events by name too
+		t.Fatal(err)
+	}
+
+	// Order-book (CLOB) role: a 9-field order tuple.
+	ex, err := os.ReadFile("testdata/clob_exchange.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ea, err := ImportEthereumABI(ex)
+	if err != nil {
+		t.Fatalf("clob_exchange import: %v", err)
+	}
+	fo, err := ea.GetMethodByName("fillOrder")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "fillOrder((uint256,address,address,address,uint256,uint256,uint256,uint8,bytes),uint256)"
+	if got := fo.canonicalSignature(); got != want {
+		t.Fatalf("fillOrder canonicalSignature=\n%q\nwant\n%q", got, want)
 	}
 }

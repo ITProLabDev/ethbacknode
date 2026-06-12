@@ -1,0 +1,16 @@
+[
+  {"type":"function","name":"splitPosition","stateMutability":"nonpayable",
+   "inputs":[{"name":"collateralToken","type":"address"},
+             {"name":"parentCollectionId","type":"bytes32"},
+             {"name":"conditionId","type":"bytes32"},
+             {"name":"partition","type":"uint256[]"},
+             {"name":"amount","type":"uint256"}],
+   "outputs":[]},
+  {"type":"event","name":"PositionSplit","anonymous":false,
+   "inputs":[{"name":"stakeholder","type":"address","indexed":true},
+             {"name":"collateralToken","type":"address","indexed":false},
+             {"name":"parentCollectionId","type":"bytes32","indexed":true},
+             {"name":"conditionId","type":"bytes32","indexed":true},
+             {"name":"partition","type":"uint256[]","indexed":false},
+             {"name":"amount","type":"uint256","indexed":false}]}
+]
