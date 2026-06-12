@@ -49,30 +49,38 @@ These are recorded in the **Future Phases** section so they are not lost.
 
 ---
 
-## Milestone 1 — ABI engine: dynamic types & tuples (`abi/`)
+## Milestone 1 — ABI engine: dynamic types & tuples (`abi/`)  ✅ DONE
 
 Pure codec work. No service dependencies. Fully unit-testable.
 
-- [ ] **M1.1** Introduce head/tail ABI encoding/decoding with offset handling.
+**Status:** Complete. Typed engine added alongside the legacy static codec
+(`abi/abitype.go`, `abi/value.go`, `abi/codec.go`; wiring in
+`abi/smartcontractabi.go`). The canonical Solidity `baz` and `sam` vectors pass
+byte-for-byte; ERC-20 `transfer` selector `0xa9059cbb` preserved. Untrusted
+32-byte counts/offsets are guarded with `big.Int.IsInt64()` + overflow-safe
+bounds. `go test ./abi/ -race` clean (49 tests), `go build ./...` and
+`go vet ./abi/` clean. See `docs/superpowers/plans/2026-06-11-m1-abi-dynamic-types.md`.
+
+- [x] **M1.1** Introduce head/tail ABI encoding/decoding with offset handling.
       Today every param is read as a flat 32-byte slot; dynamic types require
       a head section (static slots + offsets) and a tail section (dynamic data).
-- [ ] **M1.2** Add static integer widths: `uintN` / `intN` for N in 8..256
+- [x] **M1.2** Add static integer widths: `uintN` / `intN` for N in 8..256
       (step 8). Decode/encode right-aligned, 32-byte slots.
-- [ ] **M1.3** Add fixed bytes `bytes1`..`bytes32` (left-aligned) and `bytesN`
+- [x] **M1.3** Add fixed bytes `bytes1`..`bytes32` (left-aligned) and `bytesN`
       validation.
-- [ ] **M1.4** Add dynamic `bytes` and `string` (length-prefixed, 32-byte padded).
-- [ ] **M1.5** Add fixed arrays `T[N]` and dynamic arrays `T[]` for supported
+- [x] **M1.4** Add dynamic `bytes` and `string` (length-prefixed, 32-byte padded).
+- [x] **M1.5** Add fixed arrays `T[N]` and dynamic arrays `T[]` for supported
       element types.
-- [ ] **M1.6** Add `tuple` / struct support (nested `components`), including
+- [x] **M1.6** Add `tuple` / struct support (nested `components`), including
       dynamic tuples. Required for CLOB order structs.
-- [ ] **M1.7** Extend the neutral decoded model:
+- [x] **M1.7** Extend the neutral decoded model:
       ```go
       type DecodedValue struct { Name, Type string; Value any }
       type DecodedCall  struct { Method string; Inputs []DecodedValue }
       type DecodedEvent struct { Name, Contract string; Inputs []DecodedValue }
       ```
       `Value` is one of `*big.Int | []byte | string | bool | []DecodedValue`.
-- [ ] **M1.8** Unit tests for every type against canonical ABI test vectors
+- [x] **M1.8** Unit tests for every type against canonical ABI test vectors
       (encode↔decode round-trips, oversized/short input must error not panic —
       follow the existing `abi_test.go` style).
 
