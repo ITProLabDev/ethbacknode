@@ -167,6 +167,22 @@ detect/decode, project template import). `go test ./abi/ -race` clean,
 
 ## Milestone 4 — Client: receipts & logs (`clients/ethclient/`)
 
+> **Carry-over from M3 final review (for M4/M5/M6):**
+> - **Tuple OUTPUT decoding is deferred.** `ImportEthereumABI` currently rejects
+>   tuple outputs because `SmartContractAbiEntryOutput` has no `Components`
+>   field. Before M4.3 `CallMethod` can decode struct return values, extend the
+>   output model with components (mirror the input struct) and route outputs
+>   through the typed engine.
+> - **Indexed reference-type placeholder** `DecodedValue.Type` carries a
+>   `" (indexed)"` suffix that is NOT a valid ABI type string — M6 delivery/API
+>   must not feed it back into `parseType`.
+> - **Empty-name lookups:** `GetMethodByName("")` matches the first nameless
+>   entry (constructor/fallback). The call/notification layer must guard against
+>   name="" lookups.
+> - **Preset path:** the future specific contract is added as preset DATA via
+>   `ImportEthereumABI`/`NewContractFromABI` + registry cold-start — never as
+>   hardcoded Go logic. The importer is ready for it.
+
 - [ ] **M4.1** Implement `GetTransactionReceipt(txHash) (*Receipt, error)`
       (the const already exists; the method does not). Add `Receipt`/`Log` Go
       types with the project's hex-decoding `UnmarshalJSON` style.
