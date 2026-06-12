@@ -409,14 +409,22 @@ git commit -m "test(abi): arbitrary (non-token) contract registry round-trip"
 
 ---
 
-### Task 4: Polymarket-class ABI fixtures import
+### Task 4: Generic contract-class ABI fixtures import
+
+These fixtures are **generic, role-based representatives** of complex contract
+shapes — NOT the deployed Polymarket/CTF contracts. They exist to prove the
+importer handles real-world ABI complexity (dynamic arrays, `bytes32`, tuple
+structs, mixed indexed/non-indexed events), regardless of which contract it is.
+No brand names; describe by role. Method/event names like `splitPosition`,
+`fillOrder`, `OrderFilled` are generic prediction-market / order-book terms.
 
 **Files:**
-- Create: `abi/testdata/ctf_erc1155.json`
-- Create: `abi/testdata/ctf_exchange.json`
+- Create: `abi/testdata/multitoken_erc1155.json`
+- Create: `abi/testdata/outcome_market.json`
+- Create: `abi/testdata/clob_exchange.json`
 - Test: `abi/import_test.go` (append)
 
-- [ ] **Step 1: Create the fixture `abi/testdata/ctf_erc1155.json`** — a minimal Conditional-Tokens (ERC-1155) subset:
+- [ ] **Step 1: Create `abi/testdata/multitoken_erc1155.json`** — a multi-token (ERC-1155) role: per-id balances + batch + transfer events with dynamic arrays:
 
 ```json
 [
@@ -426,13 +434,6 @@ git commit -m "test(abi): arbitrary (non-token) contract registry round-trip"
   {"type":"function","name":"balanceOfBatch","stateMutability":"view",
    "inputs":[{"name":"accounts","type":"address[]"},{"name":"ids","type":"uint256[]"}],
    "outputs":[{"name":"","type":"uint256[]"}]},
-  {"type":"function","name":"splitPosition","stateMutability":"nonpayable",
-   "inputs":[{"name":"collateralToken","type":"address"},
-             {"name":"parentCollectionId","type":"bytes32"},
-             {"name":"conditionId","type":"bytes32"},
-             {"name":"partition","type":"uint256[]"},
-             {"name":"amount","type":"uint256"}],
-   "outputs":[]},
   {"type":"event","name":"TransferSingle","anonymous":false,
    "inputs":[{"name":"operator","type":"address","indexed":true},
              {"name":"from","type":"address","indexed":true},
@@ -444,7 +445,21 @@ git commit -m "test(abi): arbitrary (non-token) contract registry round-trip"
              {"name":"from","type":"address","indexed":true},
              {"name":"to","type":"address","indexed":true},
              {"name":"ids","type":"uint256[]","indexed":false},
-             {"name":"values","type":"uint256[]","indexed":false}]},
+             {"name":"values","type":"uint256[]","indexed":false}]}
+]
+```
+
+- [ ] **Step 2: Create `abi/testdata/outcome_market.json`** — an outcome/condition-market role: a method and event using `bytes32` ids + dynamic arrays + indexed `bytes32`:
+
+```json
+[
+  {"type":"function","name":"splitPosition","stateMutability":"nonpayable",
+   "inputs":[{"name":"collateralToken","type":"address"},
+             {"name":"parentCollectionId","type":"bytes32"},
+             {"name":"conditionId","type":"bytes32"},
+             {"name":"partition","type":"uint256[]"},
+             {"name":"amount","type":"uint256"}],
+   "outputs":[]},
   {"type":"event","name":"PositionSplit","anonymous":false,
    "inputs":[{"name":"stakeholder","type":"address","indexed":true},
              {"name":"collateralToken","type":"address","indexed":false},
@@ -455,7 +470,7 @@ git commit -m "test(abi): arbitrary (non-token) contract registry round-trip"
 ]
 ```
 
-- [ ] **Step 2: Create the fixture `abi/testdata/ctf_exchange.json`** — a minimal CTF Exchange subset exercising a tuple (order struct):
+- [ ] **Step 3: Create `abi/testdata/clob_exchange.json`** — an order-book (CLOB) role exercising a tuple/struct order:
 
 ```json
 [
@@ -484,41 +499,52 @@ git commit -m "test(abi): arbitrary (non-token) contract registry round-trip"
 ]
 ```
 
-- [ ] **Step 3: Write the failing test** — append to `abi/import_test.go`:
+- [ ] **Step 4: Write the failing test** — append to `abi/import_test.go`:
 
 ```go
-func TestImport_PolymarketFixtures(t *testing.T) {
-	ctf, err := os.ReadFile("testdata/ctf_erc1155.json")
+func TestImport_GenericContractClassFixtures(t *testing.T) {
+	// Multi-token (ERC-1155) role: dynamic-array methods + transfer events.
+	mt, err := os.ReadFile("testdata/multitoken_erc1155.json")
 	if err != nil {
 		t.Fatal(err)
 	}
-	a, err := ImportEthereumABI(ctf)
+	a, err := ImportEthereumABI(mt)
 	if err != nil {
-		t.Fatalf("ctf erc1155 import: %v", err)
+		t.Fatalf("multitoken import: %v", err)
 	}
-	// balanceOfBatch with address[]/uint256[]/uint256[] and splitPosition with
-	// bytes32 + uint256[] must all import and validate.
 	if _, err := a.GetMethodByName("balanceOfBatch"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := a.GetMethodByName("splitPosition"); err != nil {
-		t.Fatal(err)
-	}
-	// TransferSingle event imported with the real mainnet topic0.
+	// TransferSingle event imported with the real mainnet ERC-1155 topic0.
 	if _, err := a.GetEventByTopic0(mustHex32(t, "c3d58168c5ae7397731d063d5bbf3d657854427343f4c083240f7aacaa2d0f62")); err != nil {
 		t.Fatalf("TransferSingle topic0 not found: %v", err)
 	}
 
-	ex, err := os.ReadFile("testdata/ctf_exchange.json")
+	// Outcome-market role: bytes32 ids + dynamic arrays + indexed bytes32.
+	om, err := os.ReadFile("testdata/outcome_market.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	oa, err := ImportEthereumABI(om)
+	if err != nil {
+		t.Fatalf("outcome_market import: %v", err)
+	}
+	if _, err := oa.GetMethodByName("splitPosition"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := oa.GetMethodByName("PositionSplit"); err != nil { // GetMethodByName matches events by name too
+		t.Fatal(err)
+	}
+
+	// Order-book (CLOB) role: a 9-field order tuple.
+	ex, err := os.ReadFile("testdata/clob_exchange.json")
 	if err != nil {
 		t.Fatal(err)
 	}
 	ea, err := ImportEthereumABI(ex)
 	if err != nil {
-		t.Fatalf("ctf exchange import: %v", err)
+		t.Fatalf("clob_exchange import: %v", err)
 	}
-	// fillOrder takes a 9-field order tuple — its canonical signature must
-	// render the tuple form.
 	fo, err := ea.GetMethodByName("fillOrder")
 	if err != nil {
 		t.Fatal(err)
@@ -532,16 +558,16 @@ func TestImport_PolymarketFixtures(t *testing.T) {
 
 Add `"os"` to the `abi/import_test.go` import block.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [ ] **Step 5: Run tests to verify they pass**
 
-Run: `go test ./abi/ -run TestImport_PolymarketFixtures -v`
+Run: `go test ./abi/ -run TestImport_GenericContractClassFixtures -v`
 Expected: PASS. (If the TransferSingle topic0 assertion fails, the fixture's event signature doesn't match canonical — re-check the fixture's param types/order.)
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add abi/testdata/ctf_erc1155.json abi/testdata/ctf_exchange.json abi/import_test.go
-git commit -m "test(abi): import real Polymarket-class ABI fixtures (CTF, exchange)"
+git add abi/testdata/multitoken_erc1155.json abi/testdata/outcome_market.json abi/testdata/clob_exchange.json abi/import_test.go
+git commit -m "test(abi): import generic contract-class ABI fixtures (multitoken, outcome-market, clob)"
 ```
 
 ---

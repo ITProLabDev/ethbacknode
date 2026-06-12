@@ -183,15 +183,31 @@ topic0 map) recorded under Milestone 5. See
       without changing the existing From/To tx matching.
 - [ ] **M5.6** Match logs against managed addresses inside indexed params
       (e.g. ERC-1155 `from`/`to`/`operator`), not just `tx.To`.
+- [ ] **M5.7** **Track ALL on-chain events of a registered contract** (user
+      requirement 2026-06-12): subscribe to a contract's full event stream by
+      contract address (+ optional topic filter), decode every matching log via
+      `abi.DecodeLog`, and deliver it — independent of whether the tx touches a
+      managed address. This is broader than M5.6's managed-address matching;
+      both modes coexist (per-contract full stream AND per-address filtering).
+      A registered preset contract (see contract-preset note) auto-enables full
+      event tracking.
 
 ## Milestone 6 — Delivery & API (`subscriptions/`, `endpoint/`)
 
+> **Extensibility requirement (user, 2026-06-12):** the notification system and
+> the JSON-RPC endpoint must be EXTENSIBLE — adding a new event/notification
+> type or a new contract preset must be data/registration-driven, not a core
+> rewrite. Design `contractEvent` + the registration/subscription RPC surface
+> so new event types and presets plug in without touching the dispatch core.
+
 - [ ] **M6.1** New notification type `contractEvent` delivered to subscribers via
       the existing JSON-RPC 2.0 callback mechanism (alongside `blockEvent` /
-      `transactionEvent`).
+      `transactionEvent`). Make the notification dispatch table extensible so
+      future event types register rather than require new switch arms.
 - [ ] **M6.2** RPC methods: register a contract + ABI, list registered
-      contracts, subscribe an address/contract to contract events. Register via
-      `AddRpcProcessor` following existing `methods_*.go` patterns.
+      contracts, subscribe an address/contract to contract events (incl.
+      "all events of contract X"). Register via `AddRpcProcessor` following
+      existing `methods_*.go` patterns.
 - [ ] **M6.3** Read-only RPC: `contractCall` to invoke a view method by
       name+args and return decoded outputs.
 - [ ] **M6.4** Persist registered contracts/subscriptions in existing storage
@@ -202,8 +218,9 @@ topic0 map) recorded under Milestone 5. See
 - [ ] **M7.1** Update `DOC.md` (package table, interfaces, config, new RPC
       methods + `contractEvent` notification).
 - [ ] **M7.2** Update `API.md` with new methods and event payloads.
-- [ ] **M7.3** End-to-end test: register Polymarket CTF/CLOB ABIs, replay a
-      block with known logs, assert decoded `contractEvent` output.
+- [ ] **M7.3** End-to-end test: register a generic contract-class ABI
+      (multitoken / outcome-market / CLOB fixtures), replay a block with known
+      logs, assert decoded `contractEvent` output for ALL the contract's events.
 - [ ] **M7.4** `go test ./...` and `-race` clean.
 
 ---
