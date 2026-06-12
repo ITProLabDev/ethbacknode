@@ -86,6 +86,21 @@ bounds. `go test ./abi/ -race` clean (49 tests), `go build ./...` and
 
 ## Milestone 2 — ABI engine: event-log decoding (`abi/`)
 
+> **Carry-over notes from the M1 final review (apply during M2):**
+> - **Indexed dynamic params** (e.g. `string`/`bytes`/arrays marked `indexed`)
+>   appear in topics as their Keccak hash, NOT the original value — they are not
+>   recoverable. Do NOT blindly reuse `decodeParams` for indexed args; decode
+>   indexed (from `topics[1:]`) and non-indexed (from `data`) separately, and
+>   represent un-recoverable indexed dynamics as a hash placeholder.
+> - `DecodedEvent` (in `abi/value.go`) is already defined and ready to populate.
+> - The typed engine accepts a per-kind set of Go input types for encode
+>   (`bool`→bool, address/bytesN/bytes→[]byte, string→string, uint/int→
+>   *big.Int|int|int64|uint64); decode emits *big.Int|bool|[]byte|string|
+>   []DecodedValue. Code higher layers against these concrete types.
+> - If you construct `abiType` values by hand (not via `parseType`), set `elem`
+>   for array/slice kinds or add a nil guard — `isDynamic()`/`staticSize()`
+>   deref `t.elem`.
+
 - [ ] **M2.1** Implement event topic0 hashing: 32-byte
       `keccak256("EventName(type1,type2,...)")` (vs the 4-byte method selector).
       Extend `updateSignature` with an event branch.
