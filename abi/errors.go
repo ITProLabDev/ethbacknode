@@ -23,4 +23,8 @@ var (
 	// ErrTopicCountMismatch is returned when a log's topic count does not match
 	// the event's indexed-parameter count.
 	ErrTopicCountMismatch = errors.New("log topic count mismatch")
+	// ErrEmptyABI is returned when an imported ABI contains no entries.
+	ErrEmptyABI = errors.New("abi is empty")
+	// ErrInvalidABIJSON is returned when ABI JSON cannot be parsed.
+	ErrInvalidABIJSON = errors.New("invalid abi json")
 )
