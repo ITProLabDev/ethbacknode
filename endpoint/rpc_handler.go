@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 
+	"github.com/ITProLabDev/ethbacknode/abi"
 	"github.com/ITProLabDev/ethbacknode/address"
 	"github.com/ITProLabDev/ethbacknode/security"
 	"github.com/ITProLabDev/ethbacknode/subscriptions"
@@ -41,6 +42,7 @@ type BackRpc struct {
 	abiManager       ContractRegistry
 	contractAdder    ContractAdder
 	eventLog         EventSubscriber
+	contractCaller   ContractCaller
 }
 
 // BackRpcOption is a function that configures a BackRpc handler.
@@ -188,4 +190,16 @@ func WithAbiManager(reg ContractRegistry, adder ContractAdder) BackRpcOption {
 // WithEventSubscriber wires the eventlog subscription surface.
 func WithEventSubscriber(es EventSubscriber) BackRpcOption {
 	return func(r *BackRpc) { r.eventLog = es }
+}
+
+// ContractCaller invokes a contract view method by name and returns decoded
+// outputs. Satisfied by *ethclient.Client (M4 CallMethod), wired in main.go —
+// kept narrow so endpoint does not import clients/ethclient.
+type ContractCaller interface {
+	CallMethod(contractAddress, methodName string, args ...any) ([]abi.DecodedValue, error)
+}
+
+// WithContractCaller wires the view-call surface used by contractCall.
+func WithContractCaller(c ContractCaller) BackRpcOption {
+	return func(r *BackRpc) { r.contractCaller = c }
 }

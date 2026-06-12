@@ -55,4 +55,6 @@ func (r *BackRpc) InitProcessors() {
 	r.RegisterProcessor("contractList", r.rpcProcessContractList)
 	r.RegisterProcessor("contract.subscriptions", r.rpcProcessContractListSubscriptions)
 	r.RegisterProcessor("contractSubscriptions", r.rpcProcessContractListSubscriptions)
+	r.RegisterProcessor("contract.call", r.rpcProcessContractCall)
+	r.RegisterProcessor("contractCall", r.rpcProcessContractCall)
 }
