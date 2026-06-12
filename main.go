@@ -16,6 +16,7 @@ import (
 	"github.com/ITProLabDev/ethbacknode/address"
 	"github.com/ITProLabDev/ethbacknode/clients/ethclient"
 	"github.com/ITProLabDev/ethbacknode/endpoint"
+	"github.com/ITProLabDev/ethbacknode/eventlog"
 	"github.com/ITProLabDev/ethbacknode/security"
 	"github.com/ITProLabDev/ethbacknode/storage"
 	"github.com/ITProLabDev/ethbacknode/subscriptions"
@@ -201,6 +202,53 @@ func main() {
 	watchdogService.RegisterTransactionEventListen(txCacheManager.TransactionEvent)
 	watchdogService.RegisterBlockEventListen(subscriptionsManager.BlockEvent)
 	watchdogService.RegisterBlockEventListen(txCacheManager.BlockEvent)
+
+	// Event-log service: decode registered contracts' events per block and
+	// deliver them. Wired as a watchdog block listener (Approach A).
+	eventLogService := eventlog.New(
+		eventlog.WithLogSource(eventlog.RawLogSource{
+			GetLogsFn: func(fromBlock, toBlock int64, addresses, topics []string) ([]eventlog.RawLog, error) {
+				logs, err := chainClient.GetLogs(ethclient.LogFilter{
+					FromBlock: fromBlock, ToBlock: toBlock, Addresses: addresses, Topics: topics,
+				})
+				if err != nil {
+					return nil, err
+				}
+				out := make([]eventlog.RawLog, len(logs))
+				for i, l := range logs {
+					out[i] = eventlog.RawLog{
+						Address: l.Address, Topics: l.Topics, Data: l.Data,
+						BlockNumber: l.BlockNumber, TransactionHash: l.TransactionHash, LogIndex: l.LogIndex,
+					}
+				}
+				return out, nil
+			},
+			GetReceiptFn: func(txHash string) ([]eventlog.RawLog, error) {
+				r, err := chainClient.GetTransactionReceipt(txHash)
+				if err != nil {
+					return nil, err
+				}
+				out := make([]eventlog.RawLog, len(r.Logs))
+				for i, l := range r.Logs {
+					out[i] = eventlog.RawLog{
+						Address: l.Address, Topics: l.Topics, Data: l.Data,
+						BlockNumber: l.BlockNumber, TransactionHash: l.TransactionHash, LogIndex: l.LogIndex,
+					}
+				}
+				return out, nil
+			},
+		}),
+		eventlog.WithDecoder(eventlog.NewDecoder(abiManager.DecodeLog)),
+		eventlog.WithManaged(addressManager),
+		eventlog.WithAddressCodec(addressCodec),
+		eventlog.WithSink(func(ce *eventlog.ContractEvent) {
+			log.Info("contractEvent:", ce.Event.Name, "contract:", ce.Event.Contract, "block:", ce.BlockNumber, "tx:", ce.TransactionHash)
+		}),
+		eventlog.WithConfig(eventlog.DefaultConfig()),
+	)
+	watchdogService.RegisterBlockEventListen(func(blockNum int64, blockId string) {
+		eventLogService.OnBlock(blockNum, blockId)
+	})
 
 	log.Info("Init complete")
 	err = watchdogService.Run()
