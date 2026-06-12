@@ -96,6 +96,30 @@ func (s *subscriptionSet) all() []*Subscription {
 	return out
 }
 
+// remove drops the subscription matching (serviceID, contractAddress). If the
+// address has no subscriptions left, its map entry is deleted so addresses()
+// no longer reports it. A missing match is a no-op.
+func (s *subscriptionSet) remove(serviceID, contractAddress string) {
+	key := strings.ToLower(contractAddress)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	src := s.byAddr[key]
+	if len(src) == 0 {
+		return
+	}
+	kept := src[:0]
+	for _, sub := range src {
+		if sub.ServiceID != serviceID {
+			kept = append(kept, sub)
+		}
+	}
+	if len(kept) == 0 {
+		delete(s.byAddr, key)
+		return
+	}
+	s.byAddr[key] = kept
+}
+
 // scopeName returns the canonical string name for a scope (inverse of
 // ParseScope), used for persistence.
 func scopeName(sc Scope) string {

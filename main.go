@@ -243,11 +243,17 @@ func main() {
 		eventlog.WithDecoder(eventlog.NewDecoder(abiManager.DecodeLog)),
 		eventlog.WithManaged(addressManager),
 		eventlog.WithAddressCodec(addressCodec),
-		eventlog.WithSink(func(ce *eventlog.ContractEvent) {
-			log.Info("contractEvent:", ce.Event.Name, "contract:", ce.Event.Contract, "block:", ce.BlockNumber, "tx:", ce.TransactionHash)
-		}),
+		eventlog.WithSubscriptionStorage(storageManager.GetModuleStorage("EventLog", "eventlog").GetBinFileStorage("subscriptions.json")),
+		eventlog.WithSink(endpoint.NewContractEventSink(
+			endpoint.NotifierFunc(func(serviceID int64, subject string, payload interface{}) {
+				subscriptionsManager.NotifySubscriberRaw(subscriptions.ServiceId(serviceID), subject, payload)
+			}),
+		)),
 		eventlog.WithConfig(eventlog.DefaultConfig()),
 	)
+	if err := eventLogService.LoadSubscriptions(); err != nil {
+		log.Error("Can not load eventlog subscriptions:", err)
+	}
 	watchdogService.RegisterBlockEventListen(func(blockNum int64, blockId string) {
 		eventLogService.OnBlock(blockNum, blockId)
 	})
@@ -280,6 +286,9 @@ func main() {
 		}),
 		endpoint.WithDebugMode(config.DebugMode),
 		endpoint.WithSecurityManager(securityMaanger),
+		endpoint.WithAbiManager(abiManager, abiManager),
+		endpoint.WithEventSubscriber(eventLogService),
+		endpoint.WithContractCaller(chainClient),
 	)
 	endpointUrl, err := url.Parse(fmt.Sprintf("http://%s:%s", config.RpcAddress, config.RpcPort))
 	if err != nil {

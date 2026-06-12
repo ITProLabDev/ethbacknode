@@ -49,3 +49,10 @@ func NewContractEventSink(notifier ContractEventNotifier) eventlog.Sink {
 		notifier.NotifyContractEvent(serviceID, "contractEvent", payload)
 	}
 }
+
+// NotifierFunc adapts a function to ContractEventNotifier.
+type NotifierFunc func(serviceID int64, subject string, payload interface{})
+
+func (f NotifierFunc) NotifyContractEvent(serviceID int64, subject string, payload interface{}) {
+	f(serviceID, subject, payload)
+}
