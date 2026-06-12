@@ -134,17 +134,35 @@ topic0 map) recorded under Milestone 5. See
 >   on first call — keep any future per-entry caching behind the same `Once`
 >   (or read-only post-prepare) to stay race-free under watchdog fan-out.
 
-## Milestone 3 — Standard ABI import & generalized registry (`abi/`)
+## Milestone 3 — Standard ABI import & generalized registry (`abi/`)  ✅ DONE
 
-- [ ] **M3.1** `abi/import.go`: `ImportEthereumABI(raw []byte) (*SmartContractAbi, error)`
-      converting canonical solc/Polygonscan JSON (lowercase `type`,
+**Status:** Complete. `abi/import.go` adds `ImportEthereumABI(raw)` (accepts the
+canonical top-level JSON-array form AND the project's `{entries:[...]}` object
+form; validates every input/output type via the typed engine; rejects null
+entries and unrepresentable tuple outputs) and `NewContractFromABI(name,symbol,
+address,rawABI)`. The registry was already generic over arbitrary contracts —
+proven by a non-token round-trip test (register → lookup → decode event via
+`manager.DecodeLog`). Generic role-based ABI fixtures under `abi/testdata/`
+(multitoken ERC-1155, outcome-market, CLOB order tuple) prove the importer
+handles real-world complexity (dynamic arrays, `bytes32`, 9-field tuples, mixed
+indexed/non-indexed events) — these are GENERIC class representatives, NOT any
+deployed contract. Backward-compat verified (cold start, legacy ERC-20
+detect/decode, project template import). `go test ./abi/ -race` clean,
+`go build ./...` and `go vet ./abi/` clean. See
+`docs/superpowers/plans/2026-06-12-m3-standard-abi-import.md`.
+
+- [x] **M3.1** `abi/import.go`: `ImportEthereumABI(raw []byte) (*SmartContractAbi, error)`
+      converting canonical solc/Etherscan JSON (lowercase `type`,
       `stateMutability`, `components`, `anonymous`) into the project's own
       format. This removes the manual-conversion pain of the custom format.
-- [ ] **M3.2** Generalize `SmartContractInfo` to register **any** contract
-      (not just tokens) with its ABI; keep ERC-20 path working (regression).
-- [ ] **M3.3** Seed registry entries / fixtures for Polymarket on Polygon:
-      Conditional Tokens (ERC-1155), CTF Exchange, USDC. ABIs imported via M3.1.
-- [ ] **M3.4** Backward-compat: existing `known_contracts.json` and ERC-20
+- [x] **M3.2** Generalize the registry to register **any** contract (not just
+      tokens) with its ABI; `NewContractFromABI` constructor; ERC-20 path kept
+      working (regression). The registry was already generic — confirmed by test.
+- [x] **M3.3** Generic contract-class ABI fixtures (abstract representatives of
+      the class, NOT a deployed product): multitoken ERC-1155, outcome-market,
+      CLOB order-book with a tuple order. Imported via M3.1; prove arrays,
+      `bytes32`, tuples, and rich events all import.
+- [x] **M3.4** Backward-compat: existing `known_contracts.json` and ERC-20
       template must still load. Tests.
 
 ## Milestone 4 — Client: receipts & logs (`clients/ethclient/`)
