@@ -38,6 +38,9 @@ type BackRpc struct {
 	rpcProcessors    map[RpcMethod]RpcProcessor
 	securityManager  *security.Manager
 	burnAddress      string
+	abiManager       ContractRegistry
+	contractAdder    ContractAdder
+	eventLog         EventSubscriber
 }
 
 // BackRpcOption is a function that configures a BackRpc handler.
@@ -155,4 +158,34 @@ func (r *BackRpc) RegisterSecuredProcessor(method RpcMethod, processor RpcProces
 		}
 		processor(ctx, request, response)
 	}
+}
+
+// ContractRegistry is the subset of abi.SmartContractsManager the contract RPC
+// methods need. Wired from *abi.SmartContractsManager in main.go.
+type ContractRegistry interface {
+	GetSmartContractList() map[string]string
+}
+
+// ContractAdder registers a new contract. Split out so registration can be
+// wired without exposing the whole manager. Satisfied by *abi.SmartContractsManager.
+type ContractAdder interface {
+	AddContractFromABI(name, symbol, address string, rawABI []byte) error
+}
+
+// EventSubscriber is the subset of eventlog.Service the subscribe RPC needs.
+// Method names match *eventlog.Service exactly.
+type EventSubscriber interface {
+	SubscribeAndSaveStrings(serviceID, contractAddress, scope string) error
+	UnsubscribeStrings(serviceID, contractAddress string) error
+	ListSubscriptions() []map[string]string
+}
+
+// WithAbiManager wires the contract registry/adder used by contract RPC methods.
+func WithAbiManager(reg ContractRegistry, adder ContractAdder) BackRpcOption {
+	return func(r *BackRpc) { r.abiManager = reg; r.contractAdder = adder }
+}
+
+// WithEventSubscriber wires the eventlog subscription surface.
+func WithEventSubscriber(es EventSubscriber) BackRpcOption {
+	return func(r *BackRpc) { r.eventLog = es }
 }

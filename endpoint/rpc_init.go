@@ -42,4 +42,17 @@ func (r *BackRpc) InitProcessors() {
 
 	r.RegisterSecuredProcessor("transfer.get.estimated.fee", r.rpcProcessTransferGetEstimatedFee)
 	r.RegisterSecuredProcessor("transferGetEstimatedFee", r.rpcProcessTransferGetEstimatedFee)
+
+	// Write methods are SECURED (require serviceId + API token, like the other
+	// subscriber-mutating methods). Read-only list methods are open.
+	r.RegisterSecuredProcessor("contract.register", r.rpcProcessContractRegister)
+	r.RegisterSecuredProcessor("contractRegister", r.rpcProcessContractRegister)
+	r.RegisterSecuredProcessor("contract.subscribe", r.rpcProcessContractSubscribe)
+	r.RegisterSecuredProcessor("contractSubscribe", r.rpcProcessContractSubscribe)
+	r.RegisterSecuredProcessor("contract.unsubscribe", r.rpcProcessContractUnsubscribe)
+	r.RegisterSecuredProcessor("contractUnsubscribe", r.rpcProcessContractUnsubscribe)
+	r.RegisterProcessor("contract.list", r.rpcProcessContractList)
+	r.RegisterProcessor("contractList", r.rpcProcessContractList)
+	r.RegisterProcessor("contract.subscriptions", r.rpcProcessContractListSubscriptions)
+	r.RegisterProcessor("contractSubscriptions", r.rpcProcessContractListSubscriptions)
 }
