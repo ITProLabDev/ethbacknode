@@ -1423,4 +1423,11 @@ git commit -m "docs(abi): mark M1 (ABI dynamic types & tuples) complete"
   `decodeValue` re-bases via `block[at:]` for dynamic array/slice/tuple bodies.
 - `parseType` is recursive and shares `components` down through array suffixes,
   so `tuple[]`/`tuple[N]` resolve their element components correctly.
+- **Untrusted 32-byte counts (HARDENING — applies to Tasks 5 & 6 too):** any
+  count/length/offset read from a 32-byte slot of untrusted input must be
+  validated with `big.Int.IsInt64()` BEFORE `int(...Int64())`, and bounds must
+  be checked without additions that can overflow (use `n > len(block)-base`,
+  not `base+n > len(block)`). This bit the offset decode (Task 3) and the
+  bytes/string length decode (Task 4); the slice-length decode in Task 5 reads
+  a 32-byte element count and MUST apply the same guard.
 ```
