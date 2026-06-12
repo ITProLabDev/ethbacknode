@@ -59,3 +59,20 @@ func TestService_LoadSubscriptions_EmptyStorage(t *testing.T) {
 		t.Fatal("empty storage should yield no subscriptions")
 	}
 }
+
+func TestService_LoadSubscriptions_BadJSON(t *testing.T) {
+	st := &memStore{data: []byte(`not valid json`), exists: true}
+	svc := New(WithSubscriptionStorage(st))
+	if err := svc.LoadSubscriptions(); err == nil {
+		t.Fatal("malformed JSON must error")
+	}
+}
+
+func TestService_LoadSubscriptions_BadScope(t *testing.T) {
+	badJSON := `[{"serviceId":"s1","contractAddress":"0xAA","scope":"invalid_scope"}]`
+	st := &memStore{data: []byte(badJSON), exists: true}
+	svc := New(WithSubscriptionStorage(st))
+	if err := svc.LoadSubscriptions(); err == nil {
+		t.Fatal("bad scope in persisted data must error")
+	}
+}

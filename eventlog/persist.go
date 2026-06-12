@@ -30,6 +30,8 @@ func (s *Service) saveSubscriptions() error {
 	if s.subStorage == nil {
 		return nil
 	}
+	s.saveMu.Lock()
+	defer s.saveMu.Unlock()
 	all := s.subs.all()
 	out := make([]persistedSub, len(all))
 	for i, sub := range all {
@@ -47,7 +49,8 @@ func (s *Service) saveSubscriptions() error {
 }
 
 // LoadSubscriptions loads persisted subscriptions from storage into the set.
-// A missing/empty store is not an error.
+// A missing/empty store is not an error. Subscriptions are APPENDED to the
+// current set (safe for the one-time startup load; calling it twice duplicates).
 func (s *Service) LoadSubscriptions() error {
 	if s.subStorage == nil || !s.subStorage.IsExists() {
 		return nil

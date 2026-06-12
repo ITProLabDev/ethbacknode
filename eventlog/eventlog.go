@@ -2,6 +2,7 @@ package eventlog
 
 import (
 	"errors"
+	"sync"
 
 	"github.com/ITProLabDev/ethbacknode/abi"
 	"github.com/ITProLabDev/ethbacknode/storage"
@@ -87,6 +88,10 @@ type Service struct {
 
 	// subStorage persists event subscriptions (optional).
 	subStorage storage.BinStorage
+
+	// saveMu serializes subscription persistence so concurrent SubscribeAndSave
+	// / UnsubscribeStrings calls cannot produce a torn file write.
+	saveMu sync.Mutex
 }
 
 // Option configures a Service.
