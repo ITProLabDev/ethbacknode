@@ -2,8 +2,13 @@ package endpoint
 
 import (
 	"encoding/json"
+	"errors"
 	"testing"
 )
+
+// errBadScope is a test sentinel for an invalid-scope error returned by the
+// fake subscriber.
+var errBadScope = errors.New("invalid scope")
 
 // --- fakes for the contract RPC deps ---
 

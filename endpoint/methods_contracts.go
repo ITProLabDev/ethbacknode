@@ -1,13 +1,8 @@
 package endpoint
 
 import (
-	"errors"
 	"strconv"
 )
-
-// errBadScope is returned when a subscription scope is invalid. (The eventlog
-// layer validates the scope string; this sentinel is for test clarity.)
-var errBadScope = errors.New("invalid scope")
 
 // rpcProcessContractRegister registers a contract + ABI. params:
 // {name, symbol, address, abi (canonical JSON ABI string)}.
@@ -50,10 +45,11 @@ func (r *BackRpc) rpcProcessContractList(ctx RequestContext, request RpcRequest,
 // rpcProcessContractSubscribe subscribes a service to a contract's events.
 // params: {serviceId (number), address, scope (whole_contract|managed_only)}.
 //
-// serviceId is a JSON number (the secured wrapper authenticates it via
-// GetParamInt and requires the subscriber to already exist). The eventlog layer
-// stores it as the decimal string form so the delivery sink can route to the
-// same subscriptions.Manager serviceId.
+// serviceId is a JSON number. The secured wrapper authenticates it via
+// GetParamInt and requires the subscriber to already exist (and rejects the
+// internal service 0). The processor re-reads it from params to convert to the
+// decimal-string form the eventlog layer stores, so the delivery sink can route
+// the event back to the same subscriptions.Manager serviceId.
 func (r *BackRpc) rpcProcessContractSubscribe(ctx RequestContext, request RpcRequest, response RpcResponse) {
 	type params struct {
 		ServiceID int64  `json:"serviceId"`
