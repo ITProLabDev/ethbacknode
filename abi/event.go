@@ -21,10 +21,17 @@ func (e *SmartContractAbiEntry) Topic0() [32]byte {
 // typed engine. topics[0] is the event signature; topics[1:] carry the indexed
 // parameters in order; data carries the ABI-encoded non-indexed parameters.
 //
-// A static indexed parameter is decoded from its 32-byte topic slot. A dynamic
-// indexed parameter (string, bytes, array, tuple) is NOT recoverable from the
-// log — only keccak256(value) is stored in the topic — so it is returned as a
-// 32-byte hash placeholder with its Type suffixed " (indexed)".
+// An indexed value type (address, uint*, int*, bool, bytesN) is decoded from
+// its 32-byte topic slot. An indexed reference type (string, bytes, array —
+// fixed or dynamic — or tuple) is NOT recoverable from the log: only
+// keccak256(value) is stored in the topic, so it is returned as a 32-byte hash
+// placeholder with its Type suffixed " (indexed)". That suffixed Type is for
+// display only and is NOT a valid ABI type string — do not feed it back into
+// parseType.
+//
+// Anonymous events are not supported (the ABI model carries no anonymous flag);
+// a log for an anonymous event has no signature topic and will not match any
+// registered event, so manager-level lookup resolves it to ErrUnknownEvent.
 func (e *SmartContractAbiEntry) DecodeLog(topics [][32]byte, data []byte) (*DecodedEvent, error) {
 	if !strings.EqualFold(e.Type, "Event") {
 		return nil, ErrNotAnEvent

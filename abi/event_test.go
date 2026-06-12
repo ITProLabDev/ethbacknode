@@ -369,3 +369,39 @@ func TestManagerDecodeLog_CaseInsensitiveAddress(t *testing.T) {
 		t.Fatalf("upper-cased address must resolve (case-insensitive lookup): %v", err)
 	}
 }
+
+func TestEntryDecodeLog_IndexedStaticTupleIsHashed(t *testing.T) {
+	// An indexed STATIC tuple (uint256,address) is still stored as
+	// keccak256(value) per the Solidity spec — decoding must yield the 32-byte
+	// hash placeholder, never an attempt to decode the tuple fields.
+	e := &SmartContractAbiEntry{
+		Name: "Order",
+		Type: "Event",
+		Inputs: []*SmartContractAbiEntryInput{
+			{Name: "o", Type: "tuple", Indexed: true, Components: []*SmartContractAbiEntryInput{
+				{Name: "amt", Type: "uint256"},
+				{Name: "maker", Type: "address"},
+			}},
+			{Name: "n", Type: "uint256"},
+		},
+	}
+	tupleHash := mustHex32(t, "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899")
+	topics := [][32]byte{e.Topic0(), tupleHash}
+	data := make([]byte, 32)
+	big.NewInt(3).FillBytes(data)
+
+	ev, err := e.DecodeLog(topics, data)
+	if err != nil {
+		t.Fatalf("indexed static tuple must decode to a hash placeholder, got err: %v", err)
+	}
+	hash, ok := ev.Inputs[0].Value.([]byte)
+	if !ok || len(hash) != 32 || !bytes.Equal(hash, tupleHash[:]) {
+		t.Fatalf("tuple must be 32-byte hash placeholder, got %T %v", ev.Inputs[0].Value, ev.Inputs[0].Value)
+	}
+	if !strings.Contains(ev.Inputs[0].Type, "indexed") {
+		t.Fatalf("type should mark indexed: %q", ev.Inputs[0].Type)
+	}
+	if ev.Inputs[1].Value.(*big.Int).Int64() != 3 {
+		t.Fatalf("n=%v", ev.Inputs[1].Value)
+	}
+}
