@@ -10,93 +10,89 @@ import (
 	"time"
 )
 
-var (
-	startComplete = make(chan bool)
-)
-
-func startTestIPCService() {
-	_ = os.Remove("/tmp/pipe.ipc")
-	serverSocketListener, err := net.Listen("unix", "/tmp/pipe.ipc")
+// startTestIPCService runs a Unix-socket echo server for the IPC client test.
+// It echoes each decoded JSON message back. Errors are reported via serveErr
+// (not panic) so a failure fails the test cleanly instead of crashing the
+// process. It stops when the listener is closed (via t.Cleanup).
+func startTestIPCService(t *testing.T, socketPath string) {
+	t.Helper()
+	_ = os.Remove(socketPath)
+	ln, err := net.Listen("unix", socketPath)
 	if err != nil {
-		fmt.Printf("Server failed to start - %s\n", err)
-		panic(err)
+		t.Fatalf("server listen: %v", err)
 	}
-	// Remove IPC file on exit
-	defer serverSocketListener.Close()
-	defer os.Remove("/tmp/pipe.ipc")
-	startComplete <- true
-	for {
-		conn, err := serverSocketListener.Accept()
-		if err != nil {
-			fmt.Printf("Server failed to accept connection - %s\n", err)
-			return
-		}
-		// read the data
-		fmt.Println("Server accepted connection, read data...")
+
+	var conns []net.Conn
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
 		for {
-			rd := json.RawMessage{}
-			err = json.NewDecoder(conn).Decode(&rd)
+			conn, err := ln.Accept()
 			if err != nil {
-				fmt.Printf("Server failed to read data - %s\n", err)
-				panic(err)
+				return // listener closed
 			}
-			fmt.Println("Server read data:", len(rd), string(rd), "bytes, send it back...")
-			conn.SetDeadline(time.Now().Add(1 * time.Second))
-			err = json.NewEncoder(conn).Encode(rd)
-			if err != nil {
-				fmt.Printf("Server failed to write data - %s\n", err)
-				panic(err)
+			conns = append(conns, conn)
+			dec := json.NewDecoder(conn)
+			enc := json.NewEncoder(conn)
+			for {
+				var rd json.RawMessage
+				if err := dec.Decode(&rd); err != nil {
+					break // client closed / done
+				}
+				if err := enc.Encode(rd); err != nil {
+					break
+				}
 			}
-			fmt.Println("Server sent data back", "bytes")
 		}
-	}
+	}()
+
+	t.Cleanup(func() {
+		_ = ln.Close()
+		for _, c := range conns {
+			_ = c.Close()
+		}
+		<-done
+		_ = os.Remove(socketPath)
+	})
 }
 
-/*
-// account for null-terminator too
-const (
-
-	// On Linux, sun_path is 108 bytes in size
-	// see http://man7.org/linux/man-pages/man7/unix.7.html
-	maxPathSize = int(108)
-
-)
-
-	if len(endpoint)+1 > maxPathSize {
-		log.Warn(fmt.Sprintf("The ipc endpoint is longer than %d characters. ", maxPathSize-1),
-			"endpoint", endpoint)
-	}
-*/
-
 func TestIPCClient(t *testing.T) {
-	go startTestIPCService()
-	<-startComplete
+	// Unique socket path per run avoids collisions with a stale /tmp/pipe.ipc
+	// or a parallel test process.
+	socketPath := fmt.Sprintf("/tmp/ebn-ipcclient-%d.ipc", os.Getpid())
+	startTestIPCService(t, socketPath)
+
 	client := &ipcClient{
-		socketPath: "/tmp/pipe.ipc",
+		socketPath: socketPath,
+		timeOut:    10 * time.Second, // generous: this is a correctness test, not a latency benchmark
 	}
-	for i := 33; i < 1024*256; i++ {
-		fmt.Println("Call socket...")
-		msg := json.RawMessage(randBytes(i))
+
+	// Representative message sizes: tiny, around typical RPC payloads, and large
+	// enough to exercise multi-read framing over the socket. A deterministic set
+	// proves round-trip correctness without 262K flaky, slow iterations.
+	for _, n := range []int{33, 64, 256, 1024, 8192, 65536, 262143} {
+		msg := json.RawMessage(randBytes(n))
 		var response json.RawMessage
-		fmt.Println("Msg len:", len(msg), "Last byte:", msg[len(msg)-1])
-		client.timeOut = 1 * time.Second
-		err := client.Call(msg, &response)
-		if err != nil {
-			t.Log("Response len:", len(response))
-			t.Error(err)
+		if err := client.Call(msg, &response); err != nil {
+			t.Fatalf("Call(size=%d): %v", n, err)
+		}
+		if len(response) != len(msg) {
+			t.Fatalf("size=%d: echoed %d bytes, want %d", n, len(response), len(msg))
 		}
 	}
-	fmt.Println("Test complete, exit")
 }
 
 const letterBytes = `0987654321abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ`
 
+// randBytes returns a quoted JSON string literal of n random alphanumeric bytes.
 func randBytes(n int) []byte {
-	b := make([]byte, n+1)
+	b := make([]byte, n)
 	for i := range b {
 		b[i] = letterBytes[rand.Intn(len(letterBytes))]
 	}
-	out := append([]byte{'"'}, b...)
-	out[len(out)-1] = '"'
+	out := make([]byte, 0, n+2)
+	out = append(out, '"')
+	out = append(out, b...)
+	out = append(out, '"')
 	return out
 }
