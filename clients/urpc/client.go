@@ -94,6 +94,12 @@ type Client struct {
 	restClient restTransport // Transport for REST API calls
 }
 
+// NewClientWithTransport builds a Client around a custom rpcTransport. Intended
+// for tests that replace the network transport with a fake.
+func NewClientWithTransport(t rpcTransport) *Client {
+	return &Client{rpcClient: t}
+}
+
 // Call executes a JSON-RPC request and returns the response.
 // Returns an error if the request fails or if the response contains an error.
 func (c *Client) Call(request *Request) (response *Response, err error) {

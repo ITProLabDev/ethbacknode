@@ -111,6 +111,26 @@ func (c *Client) GetTransactionByHash(hash string) (*Transaction, error) {
 	return tx, nil
 }
 
+// GetTransactionReceipt returns the receipt for a mined transaction, including
+// its event logs. Returns ErrTransactionNotFound if the node returns null
+// (e.g. the tx is still pending or unknown).
+func (c *Client) GetTransactionReceipt(txHash string) (*Receipt, error) {
+	req := urpc.NewRequest(ethGetTransactionReceipt)
+	req.AddParams(txHash)
+	result, err := c.rpcClient.Call(req)
+	if err != nil {
+		return nil, err
+	}
+	if result.Result == nil || string(result.Result) == "null" {
+		return nil, ErrTransactionNotFound
+	}
+	receipt := new(Receipt)
+	if err := result.ParseResult(receipt); err != nil {
+		return nil, err
+	}
+	return receipt, nil
+}
+
 // GetTransactionByBlockHashAndIndex returns the information about a transaction requested by
 // block hash and tx index. If the transaction not found (geth rpc call return null),
 // it returns error.
