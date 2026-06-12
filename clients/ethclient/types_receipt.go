@@ -113,3 +113,77 @@ func unmarshalHexInt64(raw json.RawMessage, dst *int64) error {
 	*dst = n
 	return nil
 }
+
+// Receipt is a transaction receipt as returned by eth_getTransactionReceipt.
+type Receipt struct {
+	TransactionHash   string // 0x-hex tx hash
+	TransactionIndex  int64  // tx position within the block
+	BlockHash         string // 0x-hex block hash
+	BlockNumber       int64  // block number
+	From              string // sender (0x...)
+	To                string // recipient (0x...); empty for contract creation
+	ContractAddress   string // created contract address, empty if none
+	CumulativeGasUsed int64  // cumulative gas used in the block up to this tx
+	GasUsed           int64  // gas used by this tx
+	Status            int64  // 1 = success, 0 = failure
+	Logs              []*Log // event logs emitted by this tx
+}
+
+// Success reports whether the transaction succeeded (status == 1).
+func (r *Receipt) Success() bool { return r.Status == 1 }
+
+// UnmarshalJSON decodes a receipt from geth's 0x-hex JSON representation.
+func (r *Receipt) UnmarshalJSON(data []byte) error {
+	proxy := make(map[string]json.RawMessage)
+	if err := json.Unmarshal(data, &proxy); err != nil {
+		return err
+	}
+	strField := func(key string, dst *string) error {
+		if v, ok := proxy[key]; ok && string(v) != "null" {
+			return json.Unmarshal(v, dst)
+		}
+		return nil
+	}
+	intField := func(key string, dst *int64) error {
+		if v, ok := proxy[key]; ok && string(v) != "null" {
+			return unmarshalHexInt64(v, dst)
+		}
+		return nil
+	}
+	if err := strField("transactionHash", &r.TransactionHash); err != nil {
+		return err
+	}
+	if err := intField("transactionIndex", &r.TransactionIndex); err != nil {
+		return err
+	}
+	if err := strField("blockHash", &r.BlockHash); err != nil {
+		return err
+	}
+	if err := intField("blockNumber", &r.BlockNumber); err != nil {
+		return err
+	}
+	if err := strField("from", &r.From); err != nil {
+		return err
+	}
+	if err := strField("to", &r.To); err != nil {
+		return err
+	}
+	if err := strField("contractAddress", &r.ContractAddress); err != nil {
+		return err
+	}
+	if err := intField("cumulativeGasUsed", &r.CumulativeGasUsed); err != nil {
+		return err
+	}
+	if err := intField("gasUsed", &r.GasUsed); err != nil {
+		return err
+	}
+	if err := intField("status", &r.Status); err != nil {
+		return err
+	}
+	if v, ok := proxy["logs"]; ok && string(v) != "null" {
+		if err := json.Unmarshal(v, &r.Logs); err != nil {
+			return err
+		}
+	}
+	return nil
+}

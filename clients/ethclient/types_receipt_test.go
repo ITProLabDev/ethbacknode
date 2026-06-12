@@ -73,3 +73,67 @@ func TestLog_Topics32_RejectsBadLength(t *testing.T) {
 		t.Fatal("a non-32-byte topic must error")
 	}
 }
+
+const sampleReceiptJSON = `{
+  "transactionHash": "0xabc0000000000000000000000000000000000000000000000000000000000001",
+  "transactionIndex": "0x2",
+  "blockHash": "0xbbb0000000000000000000000000000000000000000000000000000000000002",
+  "blockNumber": "0x10d4f",
+  "from": "0x1111111111111111111111111111111111111111",
+  "to": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+  "cumulativeGasUsed": "0x5208",
+  "gasUsed": "0x5208",
+  "contractAddress": null,
+  "status": "0x1",
+  "logs": [
+    {
+      "address": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+      "topics": ["0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"],
+      "data": "0x00000000000000000000000000000000000000000000000000000000000003e8",
+      "blockNumber": "0x10d4f",
+      "transactionHash": "0xabc0000000000000000000000000000000000000000000000000000000000001",
+      "transactionIndex": "0x2",
+      "logIndex": "0x0",
+      "removed": false
+    }
+  ]
+}`
+
+func TestReceipt_UnmarshalJSON(t *testing.T) {
+	var r Receipt
+	if err := json.Unmarshal([]byte(sampleReceiptJSON), &r); err != nil {
+		t.Fatal(err)
+	}
+	if r.Status != 1 {
+		t.Fatalf("status=%d want 1", r.Status)
+	}
+	if r.BlockNumber != 0x10d4f {
+		t.Fatalf("blockNumber=%d", r.BlockNumber)
+	}
+	if r.GasUsed != 0x5208 {
+		t.Fatalf("gasUsed=%d", r.GasUsed)
+	}
+	if r.From != "0x1111111111111111111111111111111111111111" {
+		t.Fatalf("from=%q", r.From)
+	}
+	if len(r.Logs) != 1 {
+		t.Fatalf("logs=%d want 1", len(r.Logs))
+	}
+	if len(r.Logs[0].Topics) != 1 {
+		t.Fatalf("log topics=%d", len(r.Logs[0].Topics))
+	}
+}
+
+func TestReceipt_Success(t *testing.T) {
+	var r Receipt
+	if err := json.Unmarshal([]byte(sampleReceiptJSON), &r); err != nil {
+		t.Fatal(err)
+	}
+	if !r.Success() {
+		t.Fatal("status 0x1 should be Success")
+	}
+	r.Status = 0
+	if r.Success() {
+		t.Fatal("status 0x0 should not be Success")
+	}
+}
