@@ -217,14 +217,17 @@ detect/decode, project template import). `go test ./abi/ -race` clean,
       without changing the existing From/To tx matching.
 - [ ] **M5.6** Match logs against managed addresses inside indexed params
       (e.g. ERC-1155 `from`/`to`/`operator`), not just `tx.To`.
-- [ ] **M5.7** **Track ALL on-chain events of a registered contract** (user
-      requirement 2026-06-12): subscribe to a contract's full event stream by
-      contract address (+ optional topic filter), decode every matching log via
-      `abi.DecodeLog`, and deliver it — independent of whether the tx touches a
-      managed address. This is broader than M5.6's managed-address matching;
-      both modes coexist (per-contract full stream AND per-address filtering).
-      A registered preset contract (see contract-preset note) auto-enables full
-      event tracking.
+- [ ] **M5.7** **Per-subscription event-tracking scope** (user requirement
+      2026-06-12). The subscribe call carries a `scope` parameter; BOTH modes
+      are supported and may coexist on the same contract:
+      - `whole_contract` — ALL events of the contract (by contract address +
+        optional topic/event-name filter), regardless of participants. Decode
+        every matching log via `abi.DecodeLog` and deliver.
+      - `managed_only` — only events involving a managed address (matched inside
+        indexed params: from/to/operator/etc.), extending M5.6.
+      Scope is chosen at subscribe time (not a global flag). The eventlog
+      collector must support both filtering paths off the same decoded-log
+      stream.
 
 ## Milestone 6 — Delivery & API (`subscriptions/`, `endpoint/`)
 
@@ -239,9 +242,9 @@ detect/decode, project template import). `go test ./abi/ -race` clean,
       `transactionEvent`). Make the notification dispatch table extensible so
       future event types register rather than require new switch arms.
 - [ ] **M6.2** RPC methods: register a contract + ABI, list registered
-      contracts, subscribe an address/contract to contract events (incl.
-      "all events of contract X"). Register via `AddRpcProcessor` following
-      existing `methods_*.go` patterns.
+      contracts, subscribe to contract events with a `scope` param
+      (`whole_contract` | `managed_only`) per M5.7, list/unsubscribe. Register
+      via `AddRpcProcessor` following existing `methods_*.go` patterns.
 - [ ] **M6.3** Read-only RPC: `contractCall` to invoke a view method by
       name+args and return decoded outputs.
 - [ ] **M6.4** Persist registered contracts/subscriptions in existing storage
