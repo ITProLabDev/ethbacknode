@@ -151,3 +151,92 @@ func TestEntryDecodeLog_IndexedStaticArrayIsHashed(t *testing.T) {
 		t.Fatalf("n=%v", ev.Inputs[1].Value)
 	}
 }
+
+func TestEntryDecodeLog_IndexedDynamicPlaceholder(t *testing.T) {
+	// An indexed string is stored as keccak256(value); decoding yields the
+	// 32-byte hash placeholder, not the original string.
+	e := &SmartContractAbiEntry{
+		Name: "Named",
+		Type: "Event",
+		Inputs: []*SmartContractAbiEntryInput{
+			{Name: "key", Type: "string", Indexed: true},
+			{Name: "n", Type: "uint256"},
+		},
+	}
+	keyHash := mustHex32(t, "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899")
+	topics := [][32]byte{e.Topic0(), keyHash}
+	data := make([]byte, 32)
+	big.NewInt(7).FillBytes(data)
+
+	ev, err := e.DecodeLog(topics, data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hash, ok := ev.Inputs[0].Value.([]byte)
+	if !ok || len(hash) != 32 {
+		t.Fatalf("indexed string must be a 32-byte hash placeholder, got %T", ev.Inputs[0].Value)
+	}
+	if !bytes.Equal(hash, keyHash[:]) {
+		t.Fatalf("placeholder=%x want %x", hash, keyHash[:])
+	}
+	if !strings.Contains(ev.Inputs[0].Type, "indexed") {
+		t.Fatalf("type should mark indexed: %q", ev.Inputs[0].Type)
+	}
+	if ev.Inputs[1].Value.(*big.Int).Int64() != 7 {
+		t.Fatalf("n=%v", ev.Inputs[1].Value)
+	}
+}
+
+func TestEntryDecodeLog_Erc1155TransferBatch(t *testing.T) {
+	// TransferBatch(address operator, address from, address to,
+	//               uint256[] ids, uint256[] values)
+	// operator/from/to indexed; ids+values are non-indexed dynamic arrays in data.
+	e := &SmartContractAbiEntry{
+		Name: "TransferBatch",
+		Type: "Event",
+		Inputs: []*SmartContractAbiEntryInput{
+			{Name: "operator", Type: "address", Indexed: true},
+			{Name: "from", Type: "address", Indexed: true},
+			{Name: "to", Type: "address", Indexed: true},
+			{Name: "ids", Type: "uint256[]"},
+			{Name: "values", Type: "uint256[]"},
+		},
+	}
+	op := mustHex32(t, "000000000000000000000000"+"1111111111111111111111111111111111111111")
+	from := mustHex32(t, "000000000000000000000000"+"2222222222222222222222222222222222222222")
+	to := mustHex32(t, "000000000000000000000000"+"3333333333333333333333333333333333333333")
+	topics := [][32]byte{e.Topic0(), op, from, to}
+
+	// Build data = abi.encode(uint256[]{10,11}, uint256[]{20,21}) using the
+	// engine itself (round-trip is the check).
+	idsType, _ := parseType("uint256[]", nil)
+	valsType, _ := parseType("uint256[]", nil)
+	data, err := encodeParams([]abiType{idsType, valsType}, []any{
+		[]any{big.NewInt(10), big.NewInt(11)},
+		[]any{big.NewInt(20), big.NewInt(21)},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ev, err := e.DecodeLog(topics, data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ev.Inputs) != 5 {
+		t.Fatalf("inputs=%d", len(ev.Inputs))
+	}
+	ids := ev.Inputs[3].Value.([]DecodedValue)
+	vals := ev.Inputs[4].Value.([]DecodedValue)
+	if len(ids) != 2 || ids[0].Value.(*big.Int).Int64() != 10 || ids[1].Value.(*big.Int).Int64() != 11 {
+		t.Fatalf("ids=%+v", ids)
+	}
+	if len(vals) != 2 || vals[0].Value.(*big.Int).Int64() != 20 || vals[1].Value.(*big.Int).Int64() != 21 {
+		t.Fatalf("values=%+v", vals)
+	}
+	// indexed 'to' decoded correctly
+	wantTo, _ := hex.DecodeString("3333333333333333333333333333333333333333")
+	if !bytes.Equal(ev.Inputs[2].Value.([]byte), wantTo) {
+		t.Fatalf("to=%x", ev.Inputs[2].Value)
+	}
+}
