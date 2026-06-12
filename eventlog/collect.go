@@ -1,9 +1,12 @@
 package eventlog
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"strings"
+
+	"github.com/ITProLabDev/ethbacknode/tools/flow"
 )
 
 // collect gathers the block's logs according to the configured mode.
@@ -41,8 +44,59 @@ func parseTopic(s string) ([32]byte, error) {
 	return out, nil
 }
 
-// collectModeReceipts is implemented in Task 5 (receipts mode). Stub so the
-// package compiles after Task 4; replaced with the real parallel-fetch version.
+// txReceipt pairs a transaction hash with its fetched receipt (for FanOut).
+type txReceipt struct {
+	hash    string
+	receipt *ethReceipt
+}
+
+// collectModeReceipts fetches each of the block's transaction receipts (bounded
+// parallel) and returns the logs emitted by the subscribed contract addresses.
 func (s *Service) collectModeReceipts(blockNum int64, addrs []string) ([]*ethLog, error) {
-	return nil, fmt.Errorf("eventlog: receipts mode not yet implemented")
+	if s.blockTxHashes == nil {
+		return nil, fmt.Errorf("eventlog: receipts mode requires blockTxHashes")
+	}
+	hashes, err := s.blockTxHashes(blockNum)
+	if err != nil {
+		return nil, err
+	}
+	if len(hashes) == 0 {
+		return nil, nil
+	}
+
+	wanted := make(map[string]bool, len(addrs))
+	for _, a := range addrs {
+		wanted[strings.ToLower(a)] = true
+	}
+
+	items := make([]txReceipt, len(hashes))
+	for i, h := range hashes {
+		items[i] = txReceipt{hash: h}
+	}
+
+	results, err := flow.FanOut(context.Background(), items, s.cfg.ReceiptConcurrency,
+		func(_ context.Context, tr txReceipt) (txReceipt, error) {
+			r, err := s.source.GetTransactionReceipt(tr.hash)
+			if err != nil {
+				return tr, err
+			}
+			tr.receipt = r
+			return tr, nil
+		})
+	if err != nil {
+		return nil, err
+	}
+
+	var out []*ethLog
+	for _, tr := range results {
+		if tr.receipt == nil {
+			continue
+		}
+		for _, lg := range tr.receipt.Logs {
+			if wanted[strings.ToLower(lg.Address)] {
+				out = append(out, lg)
+			}
+		}
+	}
+	return out, nil
 }
