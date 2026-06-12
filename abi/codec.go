@@ -121,6 +121,22 @@ func encodeValue(t abiType, v any) ([]byte, error) {
 		}
 		b := []byte(s)
 		return append(leftPad32(big.NewInt(int64(len(b))).Bytes()), rightPad(b)...), nil
+	case kindArray:
+		elems, ok := v.([]any)
+		if !ok || len(elems) != t.size {
+			return nil, fmt.Errorf("%w: array[%d] expected", ErrInvalidParamsData, t.size)
+		}
+		return encodeParams(repeatType(*t.elem, len(elems)), elems)
+	case kindSlice:
+		elems, ok := v.([]any)
+		if !ok {
+			return nil, fmt.Errorf("%w: slice expected", ErrInvalidParamsData)
+		}
+		body, err := encodeParams(repeatType(*t.elem, len(elems)), elems)
+		if err != nil {
+			return nil, err
+		}
+		return append(leftPad32(big.NewInt(int64(len(elems))).Bytes()), body...), nil
 	}
 	return nil, fmt.Errorf("%w: unsupported type %q", ErrInvalidParamsData, t.canonical())
 }
@@ -251,6 +267,31 @@ func decodeValue(t abiType, block []byte, at int) (DecodedValue, error) {
 			dv.Value = raw
 		}
 		return dv, nil
+	case kindArray:
+		vals, err := decodeParams(repeatType(*t.elem, t.size), block[at:])
+		if err != nil {
+			return dv, err
+		}
+		dv.Value = vals
+		return dv, nil
+	case kindSlice:
+		if at+32 > len(block) {
+			return dv, ErrInvalidParamsData
+		}
+		nBig := new(big.Int).SetBytes(block[at : at+32])
+		if !nBig.IsInt64() {
+			return dv, ErrInvalidParamsData
+		}
+		n := int(nBig.Int64())
+		if n < 0 || n > (len(block)-(at+32))/32 {
+			return dv, ErrInvalidParamsData
+		}
+		vals, err := decodeParams(repeatType(*t.elem, n), block[at+32:])
+		if err != nil {
+			return dv, err
+		}
+		dv.Value = vals
+		return dv, nil
 	}
 	return dv, fmt.Errorf("%w: unsupported type %q", ErrInvalidParamsData, t.canonical())
 }
@@ -263,4 +304,14 @@ func decodeInt(slot []byte) *big.Int {
 		v.Sub(v, mod)
 	}
 	return v
+}
+
+// repeatType returns a slice of n copies of t, used to treat array/tuple
+// elements as a head/tail sequence.
+func repeatType(t abiType, n int) []abiType {
+	out := make([]abiType, n)
+	for i := range out {
+		out[i] = t
+	}
+	return out
 }

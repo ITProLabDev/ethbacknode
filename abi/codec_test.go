@@ -184,3 +184,84 @@ func TestDecodeValue_RejectsHugeBytesLength(t *testing.T) {
 		t.Fatal("huge positive bytes length must be rejected")
 	}
 }
+
+func TestEncodeDecode_DynamicArray(t *testing.T) {
+	st, err := parseType("uint256[]", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := encodeParams([]abiType{st}, []any{[]any{big.NewInt(1), big.NewInt(2), big.NewInt(3)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	vals, err := decodeParams([]abiType{st}, out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	arr := vals[0].Value.([]DecodedValue)
+	if len(arr) != 3 || arr[0].Value.(*big.Int).Int64() != 1 || arr[2].Value.(*big.Int).Int64() != 3 {
+		t.Fatalf("array=%+v", arr)
+	}
+}
+
+func TestEncodeDecode_FixedArray(t *testing.T) {
+	ft, err := parseType("uint256[2]", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := encodeParams([]abiType{ft}, []any{[]any{big.NewInt(7), big.NewInt(8)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// fixed static array has no length prefix: exactly 64 bytes
+	if len(out) != 64 {
+		t.Fatalf("len=%d want 64", len(out))
+	}
+	vals, err := decodeParams([]abiType{ft}, out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	arr := vals[0].Value.([]DecodedValue)
+	if len(arr) != 2 || arr[1].Value.(*big.Int).Int64() != 8 {
+		t.Fatalf("array=%+v", arr)
+	}
+}
+
+func TestDecodeParams_RejectsHugeSliceLength(t *testing.T) {
+	// A slice whose 32-byte element-count slot is enormous must be rejected,
+	// not truncated by Int64() into a value that overflows a bounds check.
+	st, err := parseType("uint256[]", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// head: offset 0x20; tail: a 32-byte all-0xff length, then nothing.
+	block := make([]byte, 96)
+	block[31] = 0x20 // offset points at byte 32
+	for i := 32; i < 64; i++ {
+		block[i] = 0xff // element count = 2^256-1
+	}
+	if _, err := decodeParams([]abiType{st}, block); err == nil {
+		t.Fatal("huge slice length must be rejected")
+	}
+}
+
+func TestEncodeDecode_ArrayOfDynamicElement(t *testing.T) {
+	// string[] exercises nested head/tail: the outer slice has a length +
+	// element offsets, and each string is itself dynamic.
+	st, err := parseType("string[]", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := encodeParams([]abiType{st}, []any{[]any{"foo", "bar"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	vals, err := decodeParams([]abiType{st}, out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	arr := vals[0].Value.([]DecodedValue)
+	if len(arr) != 2 || arr[0].Value.(string) != "foo" || arr[1].Value.(string) != "bar" {
+		t.Fatalf("array=%+v", arr)
+	}
+}
