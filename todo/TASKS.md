@@ -260,6 +260,24 @@ See `docs/superpowers/plans/2026-06-12-m5-eventlog-service.md`.
 
 ## Milestone 6 — Delivery & API (`subscriptions/`, `endpoint/`)
 
+> **Carry-over from M5 final review (for M6):**
+> - **Sink is concurrency-sensitive:** the watchdog dispatches block listeners
+>   in goroutines, so `eventlog.Sink` may be called concurrently. M6's real
+>   JSON-RPC delivery sink MUST be safe for concurrent use.
+> - **Reorg flag:** `ContractEvent.Removed` is now carried through. M6 delivery
+>   should either signal reverted events to subscribers or document that reorg
+>   handling is out of scope.
+> - **Checksummed-address invariant (managed_only):** matching works because
+>   both the managed pool and `eventMatchesScope` use the SAME codec
+>   (`EncodeBytesToAddress`, EIP-55 checksummed). If an M6 RPC registers
+>   user-supplied addresses, normalize them through the same codec or
+>   managed_only will silently under-match. Add an end-to-end test with a real
+>   checksummed managed address.
+> - **Receipts mode wiring:** `eventlog` Mode B is implemented + tested but the
+>   `blockTxHashes` seam is NOT wired in main.go (default is getLogs). To enable
+>   `ModeReceipts`, wire `blockTxHashes` from the chain client and add a config
+>   knob. Also `TransactionIndex` is now on `ContractEvent` for ordering.
+
 > **Extensibility requirement (user, 2026-06-12):** the notification system and
 > the JSON-RPC endpoint must be EXTENSIBLE — adding a new event/notification
 > type or a new contract preset must be data/registration-driven, not a core
