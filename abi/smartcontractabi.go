@@ -175,12 +175,73 @@ func (e *SmartContractAbiEntry) String() string {
 }
 
 func (e *SmartContractAbiEntry) updateSignature() {
-	var params = make([]string, len(e.Inputs))
-	for i, in := range e.Inputs {
-		params[i] = in.Type
-	}
-	h := crypto.Keccak256([]byte(e.Name + "(" + strings.Join(params, ",") + ")"))
+	h := crypto.Keccak256([]byte(e.canonicalSignature()))
 	copy(e.Signature[:], h[:4])
+}
+
+// canonicalSignature returns "name(type1,type2,...)" using canonical type
+// strings (tuples become "(...)"), matching how selectors/topics are hashed.
+func (e *SmartContractAbiEntry) canonicalSignature() string {
+	params := make([]string, len(e.Inputs))
+	for i, in := range e.Inputs {
+		typ, err := parseType(in.Type, in.Components)
+		if err != nil {
+			params[i] = in.Type // fall back to the raw string on parse failure
+			continue
+		}
+		params[i] = typ.canonical()
+	}
+	return e.Name + "(" + strings.Join(params, ",") + ")"
+}
+
+// typedInputs parses every input into the typed model.
+func (e *SmartContractAbiEntry) typedInputs() ([]abiType, error) {
+	types := make([]abiType, len(e.Inputs))
+	for i, in := range e.Inputs {
+		typ, err := parseType(in.Type, in.Components)
+		if err != nil {
+			return nil, err
+		}
+		types[i] = typ
+	}
+	return types, nil
+}
+
+// DecodeInputsTyped decodes a method call (4-byte selector + ABI args) into a
+// DecodedCall using the full typed engine. Unlike the legacy DecodeInputs, it
+// supports dynamic types and tuples.
+func (e *SmartContractAbiEntry) DecodeInputsTyped(data []byte) (*DecodedCall, error) {
+	if len(data) < 4 {
+		return nil, ErrInvalidParamsData
+	}
+	types, err := e.typedInputs()
+	if err != nil {
+		return nil, err
+	}
+	vals, err := decodeParams(types, data[4:])
+	if err != nil {
+		return nil, err
+	}
+	for i := range vals {
+		if i < len(e.Inputs) {
+			vals[i].Name = e.Inputs[i].Name
+		}
+	}
+	return &DecodedCall{Method: e.Name, Inputs: vals}, nil
+}
+
+// EncodeInputsTyped encodes a method call (selector + ABI args) from typed values.
+func (e *SmartContractAbiEntry) EncodeInputsTyped(values ...any) ([]byte, error) {
+	types, err := e.typedInputs()
+	if err != nil {
+		return nil, err
+	}
+	body, err := encodeParams(types, values)
+	if err != nil {
+		return nil, err
+	}
+	sig := e.GetSignature()
+	return append(sig[:], body...), nil
 }
 
 func (a *SmartContractAbi) _prepare() {
