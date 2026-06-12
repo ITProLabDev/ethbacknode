@@ -206,7 +206,23 @@ components). See `docs/superpowers/plans/2026-06-12-m4-client-receipts-logs.md`.
       (e.g. ERC-1155 `balanceOf(addr,id)`, `balanceOfBatch`).
 - [x] **M4.4** Tests against recorded JSON-RPC fixtures (IPC/HTTP).
 
-## Milestone 5 — Event-log service (`eventlog/`, new package)
+## Milestone 5 — Event-log service (`eventlog/`, new package)  ✅ DONE
+
+**Status:** Complete. New `eventlog/` package (Approach A — `abi/` stays pure):
+a `Service` that registers as a watchdog block listener (`OnBlock`) and, per
+block, collects the subscribed contracts' logs, decodes them via the abi
+registry, scope-filters, and hands `ContractEvent`s to a `Sink`. Mode A
+(`eth_getLogs` per block) and Mode B (per-receipt via `tools/flow.FanOut`
+bounded parallel fetch) both feed one decoded stream; config selects the mode
+(default getLogs). Per-subscription `Scope` (`whole_contract` | `managed_only`)
+filters after decode — managed_only matches a managed address inside the
+event's address-typed params. eventlog stays decoupled from `clients/ethclient`
+via its own `LogSource`/`Decoder` interfaces; `main.go` wires real adapters
+(`RawLogSource`, `NewDecoder(abiManager.DecodeLog)`) and registers `OnBlock` —
+zero watchdog-internals change. M5's sink logs the event; M6 replaces it with
+JSON-RPC `contractEvent` delivery + registration/subscription RPC.
+`go test ./eventlog/ -race` clean (17 tests), `go build ./...` and `go vet` clean.
+See `docs/superpowers/plans/2026-06-12-m5-eventlog-service.md`.
 
 > **Carry-over from M2 review (perf, apply when log volume matters):**
 > `(*SmartContractAbi).GetEventByTopic0` is O(entries) per log and recomputes
@@ -215,22 +231,22 @@ components). See `docs/superpowers/plans/2026-06-12-m4-client-receipts-logs.md`.
 > `_prepare()` and look up by topic0 in O(1). Not needed for correctness; only
 > if profiling shows it hot.
 
-- [ ] **M5.1** New package `eventlog/` (Approach A): consumes a chain client +
+- [x] **M5.1** New package `eventlog/` (Approach A): consumes a chain client +
       the ABI registry, decodes logs into `DecodedEvent`, and exposes a
       listener handler. `abi/` stays a pure library with no service deps.
-- [ ] **M5.2** Mode A — `eth_getLogs` per block: one call per block filtered by
+- [x] **M5.2** Mode A — `eth_getLogs` per block: one call per block filtered by
       registered contract addresses/topics; independent of tx count.
-- [ ] **M5.3** Mode B — per-receipt: fetch `eth_getTransactionReceipt` for
+- [x] **M5.3** Mode B — per-receipt: fetch `eth_getTransactionReceipt` for
       relevant txs and decode their logs. Use `tools/flow.FanOut` for bounded,
       order-preserving parallel receipt fetching — see [`PIPELINE-FLOW.md`](./PIPELINE-FLOW.md).
-- [ ] **M5.4** Config flag to switch modes (default = `getLogs`). Document
+- [x] **M5.4** Config flag to switch modes (default = `getLogs`). Document
       load/latency trade-offs.
-- [ ] **M5.5** Watchdog integration: register `eventlog` as an additional
+- [x] **M5.5** Watchdog integration: register `eventlog` as an additional
       listener in the block-processing path (`watchdog/processblock.go`)
       without changing the existing From/To tx matching.
-- [ ] **M5.6** Match logs against managed addresses inside indexed params
+- [x] **M5.6** Match logs against managed addresses inside indexed params
       (e.g. ERC-1155 `from`/`to`/`operator`), not just `tx.To`.
-- [ ] **M5.7** **Per-subscription event-tracking scope** (user requirement
+- [x] **M5.7** **Per-subscription event-tracking scope** (user requirement
       2026-06-12). The subscribe call carries a `scope` parameter; BOTH modes
       are supported and may coexist on the same contract:
       - `whole_contract` — ALL events of the contract (by contract address +
