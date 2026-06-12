@@ -84,3 +84,23 @@ func (s *subscriptionSet) addresses() []string {
 	}
 	return out
 }
+
+// all returns a flat copy of every subscription across all addresses.
+func (s *subscriptionSet) all() []*Subscription {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var out []*Subscription
+	for _, subs := range s.byAddr {
+		out = append(out, subs...)
+	}
+	return out
+}
+
+// scopeName returns the canonical string name for a scope (inverse of
+// ParseScope), used for persistence.
+func scopeName(sc Scope) string {
+	if sc == ScopeManagedOnly {
+		return "managed_only"
+	}
+	return "whole_contract"
+}

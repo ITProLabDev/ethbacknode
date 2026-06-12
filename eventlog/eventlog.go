@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/ITProLabDev/ethbacknode/abi"
+	"github.com/ITProLabDev/ethbacknode/storage"
 	"github.com/ITProLabDev/ethbacknode/tools/log"
 )
 
@@ -83,6 +84,9 @@ type Service struct {
 	// blockTxHashes returns the tx hashes in a block (Mode B). Wired in main.go
 	// from the chain client; a test seam in unit tests.
 	blockTxHashes func(blockNum int64) ([]string, error)
+
+	// subStorage persists event subscriptions (optional).
+	subStorage storage.BinStorage
 }
 
 // Option configures a Service.
