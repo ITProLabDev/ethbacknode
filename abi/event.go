@@ -101,3 +101,44 @@ func decodeIndexedTopic(in *SmartContractAbiEntryInput, topic [32]byte) (Decoded
 	}
 	return decodeValue(typ, topic[:], 0)
 }
+
+// GetEventByTopic0 finds the event entry whose signature hash equals topic0.
+func (a *SmartContractAbi) GetEventByTopic0(topic0 [32]byte) (*SmartContractAbiEntry, error) {
+	a._prepare()
+	for _, entry := range a.Entries {
+		if !strings.EqualFold(entry.Type, "Event") {
+			continue
+		}
+		if entry.Topic0() == topic0 {
+			return entry, nil
+		}
+	}
+	return nil, ErrUnknownEvent
+}
+
+// DecodeLog finds the contract registered at contractAddress, matches the event
+// by topics[0], and decodes the log. The returned DecodedEvent has Contract set
+// to contractAddress as-is (case-preserving); the internal registry lookup is
+// case-insensitive.
+func (m *SmartContractsManager) DecodeLog(contractAddress string, topics [][32]byte, data []byte) (*DecodedEvent, error) {
+	if len(topics) == 0 {
+		return nil, ErrTopicCountMismatch
+	}
+	contract, err := m.GetSmartContractByAddress(contractAddress)
+	if err != nil {
+		return nil, err
+	}
+	if contract.Abi == nil {
+		return nil, ErrUnknownEvent
+	}
+	entry, err := contract.Abi.GetEventByTopic0(topics[0])
+	if err != nil {
+		return nil, err
+	}
+	ev, err := entry.DecodeLog(topics, data)
+	if err != nil {
+		return nil, err
+	}
+	ev.Contract = contractAddress
+	return ev, nil
+}

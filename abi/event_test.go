@@ -240,3 +240,132 @@ func TestEntryDecodeLog_Erc1155TransferBatch(t *testing.T) {
 		t.Fatalf("to=%x", ev.Inputs[2].Value)
 	}
 }
+
+func TestManagerDecodeLog_ByContractAddress(t *testing.T) {
+	m := newTestManager(t) // helper from abi_test.go: builds a manager with mem storage + hex codec
+	contractAddr := "0x1234567890123456789012345678901234567890"
+	transfer := &SmartContractAbiEntry{
+		Name: "Transfer",
+		Type: "Event",
+		Inputs: []*SmartContractAbiEntryInput{
+			{Name: "from", Type: "address", Indexed: true},
+			{Name: "to", Type: "address", Indexed: true},
+			{Name: "value", Type: "uint256"},
+		},
+	}
+	m.Add(&SmartContractInfo{
+		Name:            "Tok",
+		Symbol:          "TOK",
+		ContractAddress: contractAddr,
+		Abi:             &SmartContractAbi{Entries: []*SmartContractAbiEntry{transfer}},
+	})
+
+	from := mustHex32(t, "000000000000000000000000"+"1111111111111111111111111111111111111111")
+	to := mustHex32(t, "000000000000000000000000"+"2222222222222222222222222222222222222222")
+	topics := [][32]byte{transfer.Topic0(), from, to}
+	data := make([]byte, 32)
+	big.NewInt(500).FillBytes(data)
+
+	ev, err := m.DecodeLog(contractAddr, topics, data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ev.Name != "Transfer" || ev.Contract != contractAddr {
+		t.Fatalf("event=%+v", ev)
+	}
+	if ev.Inputs[2].Value.(*big.Int).Int64() != 500 {
+		t.Fatalf("value=%v", ev.Inputs[2].Value)
+	}
+}
+
+func TestAbiGetEventByTopic0(t *testing.T) {
+	transfer := &SmartContractAbiEntry{
+		Name: "Transfer",
+		Type: "Event",
+		Inputs: []*SmartContractAbiEntryInput{
+			{Name: "from", Type: "address", Indexed: true},
+			{Name: "to", Type: "address", Indexed: true},
+			{Name: "value", Type: "uint256"},
+		},
+	}
+	a := &SmartContractAbi{Entries: []*SmartContractAbiEntry{transfer}}
+	got, err := a.GetEventByTopic0(transfer.Topic0())
+	if err != nil || got.Name != "Transfer" {
+		t.Fatalf("got %v err %v", got, err)
+	}
+	var zero [32]byte
+	if _, err := a.GetEventByTopic0(zero); err == nil {
+		t.Fatal("unknown topic0 must error")
+	}
+}
+
+func TestManagerDecodeLog_UnknownContract(t *testing.T) {
+	m := newTestManager(t)
+	topics := [][32]byte{mustHex32(t, "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899")}
+	if _, err := m.DecodeLog("0x9999999999999999999999999999999999999999", topics, nil); err == nil {
+		t.Fatal("unknown contract must error")
+	}
+}
+
+func TestManagerDecodeLog_UnknownTopic0(t *testing.T) {
+	m := newTestManager(t)
+	addr := "0x1234567890123456789012345678901234567890"
+	transfer := &SmartContractAbiEntry{
+		Name: "Transfer",
+		Type: "Event",
+		Inputs: []*SmartContractAbiEntryInput{
+			{Name: "from", Type: "address", Indexed: true},
+			{Name: "to", Type: "address", Indexed: true},
+			{Name: "value", Type: "uint256"},
+		},
+	}
+	m.Add(&SmartContractInfo{
+		Name: "Tok", Symbol: "TOK", ContractAddress: addr,
+		Abi: &SmartContractAbi{Entries: []*SmartContractAbiEntry{transfer}},
+	})
+	var unknown [32]byte
+	unknown[0] = 0xde // not Transfer's topic0
+	if _, err := m.DecodeLog(addr, [][32]byte{unknown}, nil); err == nil {
+		t.Fatal("unknown topic0 must error")
+	}
+}
+
+func TestManagerDecodeLog_NilAbi(t *testing.T) {
+	m := newTestManager(t)
+	addr := "0x4444444444444444444444444444444444444444"
+	m.Add(&SmartContractInfo{Name: "NoAbi", Symbol: "NA", ContractAddress: addr, Abi: nil})
+	topics := [][32]byte{mustHex32(t, "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899")}
+	if _, err := m.DecodeLog(addr, topics, nil); err == nil {
+		t.Fatal("nil Abi must error")
+	}
+}
+
+func TestManagerDecodeLog_CaseInsensitiveAddress(t *testing.T) {
+	m := newTestManager(t)
+	// Register a letter-containing address (stored lowercased by the registry).
+	addr := "0xabcdef0000000000000000000000000000000001"
+	transfer := &SmartContractAbiEntry{
+		Name: "Transfer",
+		Type: "Event",
+		Inputs: []*SmartContractAbiEntryInput{
+			{Name: "from", Type: "address", Indexed: true},
+			{Name: "to", Type: "address", Indexed: true},
+			{Name: "value", Type: "uint256"},
+		},
+	}
+	m.Add(&SmartContractInfo{
+		Name: "Tok", Symbol: "TOK", ContractAddress: addr,
+		Abi: &SmartContractAbi{Entries: []*SmartContractAbiEntry{transfer}},
+	})
+	from := mustHex32(t, "000000000000000000000000"+"1111111111111111111111111111111111111111")
+	to := mustHex32(t, "000000000000000000000000"+"2222222222222222222222222222222222222222")
+	topics := [][32]byte{transfer.Topic0(), from, to}
+	data := make([]byte, 32)
+	big.NewInt(1).FillBytes(data)
+
+	// Look up with an UPPER-cased address — registry lookup is case-insensitive.
+	upper := "0x" + strings.ToUpper("abcdef0000000000000000000000000000000001")
+	if _, err := m.DecodeLog(upper, topics, data); err != nil {
+		t.Fatalf("upper-cased address must resolve (case-insensitive lookup): %v", err)
+	}
+}
