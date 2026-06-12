@@ -91,3 +91,28 @@ func TestImportEthereumABI_Tuple(t *testing.T) {
 		t.Fatalf("canonicalSignature=%q", got)
 	}
 }
+
+func TestNewContractFromABI(t *testing.T) {
+	c, err := NewContractFromABI("MyToken", "MTK", "0xAbC1230000000000000000000000000000000001", []byte(erc20ABIArray))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Name != "MyToken" || c.Symbol != "MTK" {
+		t.Fatalf("contract meta=%+v", c)
+	}
+	if c.ContractAddress != "0xAbC1230000000000000000000000000000000001" {
+		t.Fatalf("address not preserved: %q", c.ContractAddress)
+	}
+	if c.Abi == nil || len(c.Abi.Entries) != 2 {
+		t.Fatalf("abi not attached: %+v", c.Abi)
+	}
+}
+
+func TestNewContractFromABI_RejectsBadABI(t *testing.T) {
+	if _, err := NewContractFromABI("X", "X", "0x01", []byte(`[]`)); err == nil {
+		t.Fatal("empty abi must be rejected")
+	}
+	if _, err := NewContractFromABI("X", "X", "0x01", []byte(`garbage`)); err == nil {
+		t.Fatal("bad json must be rejected")
+	}
+}

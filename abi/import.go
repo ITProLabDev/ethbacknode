@@ -69,3 +69,20 @@ func ImportEthereumABI(raw []byte) (*SmartContractAbi, error) {
 
 	return abi, nil
 }
+
+// NewContractFromABI builds a SmartContractInfo from a name, symbol, contract
+// address, and a canonical Ethereum JSON ABI. The address is stored as-is
+// (the registry lowercases it for lookups). Returns an error if the ABI is
+// empty or invalid.
+func NewContractFromABI(name, symbol, address string, rawABI []byte) (*SmartContractInfo, error) {
+	abi, err := ImportEthereumABI(rawABI)
+	if err != nil {
+		return nil, err
+	}
+	return &SmartContractInfo{
+		Name:            name,
+		Symbol:          symbol,
+		ContractAddress: address,
+		Abi:             abi,
+	}, nil
+}
