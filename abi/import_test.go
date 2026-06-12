@@ -1,6 +1,7 @@
 package abi
 
 import (
+	"errors"
 	"math/big"
 	"os"
 	"testing"
@@ -260,5 +261,22 @@ func TestImportEthereumABI_ProjectTemplateRoundTrips(t *testing.T) {
 	}
 	if _, err := a.GetMethodByName("transfer"); err != nil {
 		t.Fatalf("template transfer missing: %v", err)
+	}
+}
+
+func TestImportEthereumABI_SentinelErrors(t *testing.T) {
+	// The public error contract distinguishes "empty" from "malformed" so
+	// callers (M4 RPC / M6 delivery) can branch on it.
+	if _, err := ImportEthereumABI([]byte(`[]`)); !errors.Is(err, ErrEmptyABI) {
+		t.Fatalf("empty array: want ErrEmptyABI, got %v", err)
+	}
+	if _, err := ImportEthereumABI([]byte(`{"entries":[]}`)); !errors.Is(err, ErrEmptyABI) {
+		t.Fatalf("empty object: want ErrEmptyABI, got %v", err)
+	}
+	if _, err := ImportEthereumABI([]byte(`not json`)); !errors.Is(err, ErrInvalidABIJSON) {
+		t.Fatalf("garbage: want ErrInvalidABIJSON, got %v", err)
+	}
+	if _, err := ImportEthereumABI([]byte(`[{"type":"function","name":"x","inputs":[{"name":"a","type":"uint999"}]}]`)); !errors.Is(err, ErrInvalidABIJSON) {
+		t.Fatalf("bad type: want ErrInvalidABIJSON, got %v", err)
 	}
 }
