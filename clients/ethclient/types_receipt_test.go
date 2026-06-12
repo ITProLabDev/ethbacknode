@@ -60,6 +60,11 @@ func TestLog_Topics32(t *testing.T) {
 	if t32[0][0] != 0xdd || t32[0][31] != 0xef {
 		t.Fatalf("topic0=%x", t32[0])
 	}
+	// All topics must be decoded, not just topic0: topic1/topic2 are
+	// left-padded addresses ending in 0x11.../0x22...
+	if t32[1][31] != 0x11 || t32[2][31] != 0x22 {
+		t.Fatalf("topic1=%x topic2=%x", t32[1], t32[2])
+	}
 }
 
 func TestLog_Topics32_RejectsBadLength(t *testing.T) {
