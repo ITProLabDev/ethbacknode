@@ -227,3 +227,38 @@ func TestImport_GenericContractClassFixtures(t *testing.T) {
 		t.Fatalf("fillOrder canonicalSignature=\n%q\nwant\n%q", got, want)
 	}
 }
+
+func TestBackwardCompat_ColdStartAndErc20(t *testing.T) {
+	// newTestManager calls Init, which ColdStarts the built-in template and
+	// loads the ERC-20 abi. The legacy path must still work after M3.
+	m := newTestManager(t)
+	list := m.GetSmartContractList()
+	if len(list) == 0 {
+		t.Fatal("cold start should load at least one template contract")
+	}
+	// ERC-20 transfer detection (legacy static codec path) must still work.
+	addr := mustHex(t, "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef")
+	data := transferCallData(t, addr, big.NewInt(123)) // helper from abi_test.go
+	if !m.Erc20IsTransfer(data) {
+		t.Fatal("ERC-20 transfer detection broke")
+	}
+	gotAddr, gotAmount, err := m.Erc20DecodeIfTransfer(data)
+	if err != nil || gotAmount.Int64() != 123 {
+		t.Fatalf("legacy decode broke: %s %v %v", gotAddr, gotAmount, err)
+	}
+}
+
+func TestImportEthereumABI_ProjectTemplateRoundTrips(t *testing.T) {
+	// The project's own erc20 template (capitalized "Function"/"Event" types,
+	// object form) must import via ImportEthereumABI without error.
+	a, err := ImportEthereumABI([]byte(erc20tpl))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(a.Entries) == 0 {
+		t.Fatal("template imported empty")
+	}
+	if _, err := a.GetMethodByName("transfer"); err != nil {
+		t.Fatalf("template transfer missing: %v", err)
+	}
+}
