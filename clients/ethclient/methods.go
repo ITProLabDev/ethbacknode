@@ -372,21 +372,6 @@ func (c *Client) GetEstimatedGasPrice() (gasPrice *big.Int, err error) {
 	return gasPrice, nil
 }
 
-func (c *Client) GetEstimatedFee(from, to, data string, amount *big.Int) (fee, gasPrice *big.Int, gas int64, err error) {
-	gas, err = c.GetEstimatedGas(from, to, data, amount)
-	if err != nil {
-		return nil, nil, 0, err
-	}
-	log.Warning("Estimated Gas:", gas)
-	gasPrice, err = c.GetEstimatedGasPrice()
-	if err != nil {
-		return nil, nil, 0, err
-	}
-	log.Warning("Estimated Gas Price:", gasPrice)
-	fee = new(big.Int).Mul(gasPrice, big.NewInt(gas))
-	return fee, gasPrice, gas, nil
-}
-
 func (c *Client) PendingNonceAt(address string) (nonce int64, err error) {
 	req := urpc.NewRequest(ethGetTransactionCount)
 	req.AddParams(address, "pending")

@@ -16,6 +16,10 @@ type Config struct {
 	Confirmations int  `json:"confirmations"`
 	Debug         bool `json:"debug"`
 	Tokens        []*types.TokenInfo
+	// FeeCeilingGwei is the most this node will offer per unit of gas,
+	// whichever envelope a transaction is signed in. 0 (the default) means
+	// no ceiling.
+	FeeCeilingGwei int64 `json:"feeCeilingGwei,omitempty"`
 }
 
 func _configDefaultStorage() storage.BinStorage {

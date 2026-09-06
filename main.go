@@ -15,6 +15,7 @@ import (
 	"github.com/ITProLabDev/ethbacknode/abi"
 	"github.com/ITProLabDev/ethbacknode/address"
 	"github.com/ITProLabDev/ethbacknode/clients/ethclient"
+	"github.com/ITProLabDev/ethbacknode/clients/txmanager"
 	"github.com/ITProLabDev/ethbacknode/endpoint"
 	"github.com/ITProLabDev/ethbacknode/eventlog"
 	"github.com/ITProLabDev/ethbacknode/presets"
@@ -159,6 +160,18 @@ func main() {
 	for _, token := range chainClient.TokensList() {
 		log.Info("- Token:", token.Name, "(", token.Symbol, ")")
 	}
+	// Nonce allocator: the client and the manager are mutually dependent at
+	// construction (the manager seeds its cursor from the client, the client
+	// takes its nonces from the manager), so the client is completed with
+	// SetNonceSource only after both exist. Without this, the client falls
+	// back to asking the node directly on every send, which is correct for
+	// one transaction at a time and wrong for two prepared back to back.
+	txManagerStorage := storageManager.GetModuleStorage("TxManager", "txmanager")
+	nonceManager := txmanager.NewNonceManager(
+		txmanager.WithChain(chainClient),
+		txmanager.WithStore(txmanager.NewBadgerHoldStore(txManagerStorage.GetNewBadgerHoldStorage("nonces.db"))),
+	)
+	chainClient.SetNonceSource(nonceManager)
 	// Init Address Manager
 	addressStorage := storageManager.GetModuleStorage("Address", "address")
 	addressManager, err := address.NewManager(

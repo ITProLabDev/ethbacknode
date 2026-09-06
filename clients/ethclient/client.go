@@ -56,6 +56,7 @@ type Client struct {
 	addressCodec     address.AddressCodec       // Address encoder/decoder
 	tokens           []*types.TokenInfo         // Supported tokens list
 	minConfirmations int                        // Required confirmations
+	nonceSource      NonceSource                // Nonce allocator seam; nil falls back to PendingNonceAt
 }
 
 // BalanceOf returns the native coin balance of an address in wei.
@@ -277,7 +278,7 @@ func (c *Client) TransferByPrivateKey(fromPrivateKey []byte, from, to string, am
 		return "", err
 	}
 	log.Warning("Current Balance:", currentBalance)
-	fee, gasPrice, gas, err := c.GetEstimatedFee(fromAddress, to, "", currentBalance)
+	fees, gas, fee, err := c.resolveTransferFees(fromAddress, to, currentBalance)
 	if err != nil {
 		return "", err
 	}
@@ -287,7 +288,7 @@ func (c *Client) TransferByPrivateKey(fromPrivateKey []byte, from, to string, am
 	if amountWithFee.Cmp(currentBalance) > 0 {
 		return "", ErrInsufficientFunds
 	}
-	return c.sendRawByPrivateKeyUnsafe(fromPrivateKey, from, to, amount, gasPrice, gas)
+	return c.sendRawByPrivateKeyUnsafe(fromPrivateKey, from, to, amount, fees, gas)
 }
 
 func (c *Client) TransferAllByPrivateKey(fromPrivateKey []byte, from, to string) (txHash string, err error) {
@@ -307,7 +308,7 @@ func (c *Client) TransferAllByPrivateKey(fromPrivateKey []byte, from, to string)
 		return "", err
 	}
 	log.Warning("Current Balance:", currentBalance)
-	fee, gasPrice, gas, err := c.GetEstimatedFee(fromAddress, to, "", currentBalance)
+	fees, gas, fee, err := c.resolveTransferFees(fromAddress, to, currentBalance)
 	if err != nil {
 		return "", err
 	}
@@ -317,11 +318,11 @@ func (c *Client) TransferAllByPrivateKey(fromPrivateKey []byte, from, to string)
 	if amountToTransfer.Cmp(big.NewInt(0)) <= 0 {
 		return "", ErrNothingToTransfer
 	}
-	return c.sendRawByPrivateKeyUnsafe(fromPrivateKey, from, to, amountToTransfer, gasPrice, gas)
+	return c.sendRawByPrivateKeyUnsafe(fromPrivateKey, from, to, amountToTransfer, fees, gas)
 }
 
 func (c *Client) TransferGetEstimatedFee(from, to string, amount *big.Int) (fee *big.Int, err error) {
-	fee, _, _, err = c.GetEstimatedFee(from, to, "", amount)
+	_, _, fee, err = c.resolveTransferFees(from, to, amount)
 	if err != nil {
 		return nil, err
 	}
