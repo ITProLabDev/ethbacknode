@@ -21,6 +21,7 @@ func (w *Service) runLoop() {
 		memPoolContent, err := w.client.MemPoolContent()
 		if err != nil {
 			log.Error("Can not get mempool content:", err)
+			w.mux.Unlock()
 			time.Sleep(time.Duration(w.checkInterval) * time.Second)
 			continue
 		}
@@ -52,26 +53,31 @@ func (w *Service) runLoop() {
 					err = w.processBlock(processBlock)
 					if err != nil {
 						log.Error("Can not process block:", processBlock, err)
-						w.mux.Unlock()
-						continue
+						// Stop this tick's catch-up here rather than skipping
+						// the failed block: lastSeenBlock (and so the
+						// persisted state below) must stay at the last block
+						// that actually succeeded, so the next tick retries
+						// from this one instead of silently treating it as
+						// processed.
+						break
 					}
 					w.state.UpdateState(processBlock)
+					lastSeenBlock = processBlock
 				}
 			} else {
 				err = w.processBlock(currentBlock)
 				if err != nil {
 					log.Error("Can not process block:", currentBlock, err)
-					w.mux.Unlock()
-					continue
+				} else {
+					lastSeenBlock = currentBlock
 				}
 			}
-			lastSeenBlock = currentBlock
 		} else {
 			if w.config.Debug {
 				log.Debug("No new blocks, skip...")
 			}
 		}
-		_ = w.state.UpdateState(currentBlock)
+		_ = w.state.UpdateState(lastSeenBlock)
 		w.mux.Unlock()
 		time.Sleep(time.Duration(w.checkInterval) * time.Second)
 	}
