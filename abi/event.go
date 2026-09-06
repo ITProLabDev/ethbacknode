@@ -2,19 +2,17 @@ package abi
 
 import (
 	"strings"
-
-	"github.com/ITProLabDev/ethbacknode/crypto"
 )
 
 // Topic0 returns the 32-byte event signature hash
 // keccak256("EventName(type1,type2,...)") used as topics[0] for a
 // non-anonymous event. Unlike a method selector (first 4 bytes), an event
-// topic uses the full 32-byte hash.
+// topic uses the full 32-byte hash. Cached alongside the method selector by
+// updateSignature, so decoding a log does not re-hash the entry's canonical
+// signature on every call.
 func (e *SmartContractAbiEntry) Topic0() [32]byte {
-	h := crypto.Keccak256([]byte(e.canonicalSignature()))
-	var out [32]byte
-	copy(out[:], h)
-	return out
+	e.updateSignature()
+	return e.topic0
 }
 
 // DecodeLog decodes an event log (topics + data) into a DecodedEvent using the

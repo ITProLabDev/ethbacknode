@@ -20,6 +20,7 @@ func WithStorage(storage storage.BinStorage) Option {
 		m.storage = storage
 	}
 }
+
 // WithAddressCodec sets the address encoder/decoder for ABI encoding.
 func WithAddressCodec(codec address.AddressCodec) Option {
 	return func(m *SmartContractsManager) {
@@ -44,7 +45,13 @@ func NewManager(options ...Option) *SmartContractsManager {
 // SmartContractsManager manages known smart contracts and provides ABI encoding.
 // Maintains lookup maps by symbol, name, and address for efficient queries.
 type SmartContractsManager struct {
-	mux          sync.RWMutex
+	mux sync.RWMutex
+
+	// saveMu serializes persistence. mux is an RWMutex, so two concurrent Saves
+	// would both hold it for reading and write the file at the same time; this
+	// makes the writes sequential and each one whole.
+	saveMu sync.Mutex
+
 	storage      storage.BinStorage
 	contracts    []*SmartContractInfo
 	bySymbol     map[string]*SmartContractInfo
@@ -73,18 +80,28 @@ func (m *SmartContractsManager) afterLoad() {
 	}
 }
 
+// addUnsafe registers c unless it collides with something already present.
+// The caller must hold mux for writing.
+//
+// Address matching is case-insensitive, matching how byAddress is keyed and
+// how GetSmartContractByAddress looks up: an EIP-55 checksummed address and
+// its lowercase form name the same contract, and registering both must not
+// produce two entries.
 func (m *SmartContractsManager) addUnsafe(c *SmartContractInfo) {
-	for _, ec := range m.contracts {
-		if ec.Name == c.Name && ec.ContractAddress == c.ContractAddress {
-			return
-		} else if ec.Name == c.Name {
-			log.Critical("Duplicated Contract Name:", c.Name)
-			return
-		} else if ec.ContractAddress == c.ContractAddress {
-			log.Critical("Duplicated Contract AddressBytes:", c.ContractAddress)
-			return
+	addressKey := strings.ToLower(c.ContractAddress)
+
+	if existing, found := m.byAddress[addressKey]; found {
+		if existing.Name == c.Name {
+			return // already registered; re-adding is a no-op
 		}
+		log.Critical("Duplicated Contract AddressBytes:", c.ContractAddress)
+		return
 	}
+	if _, found := m.byName[c.Name]; found {
+		log.Critical("Duplicated Contract Name:", c.Name)
+		return
+	}
+
 	m.contracts = append(m.contracts, c)
 	m.afterLoad()
 }
@@ -106,6 +123,7 @@ func (m *SmartContractsManager) Init() error {
 	}
 	return m.Load()
 }
+
 // Add adds a smart contract to the registry. Thread-safe.
 func (m *SmartContractsManager) Add(c *SmartContractInfo) {
 	m.mux.Lock()
@@ -134,11 +152,21 @@ func (m *SmartContractsManager) Load() (err error) {
 	return nil
 }
 
-// Save persists the known contracts to storage.
+// Save persists the known contracts to storage. Concurrent calls are
+// serialized, so the stored file is always one complete snapshot rather than
+// two interleaved ones.
 func (m *SmartContractsManager) Save() (err error) {
+	if m.storage == nil {
+		return ErrConfigStorageEmpty
+	}
+	m.saveMu.Lock()
+	defer m.saveMu.Unlock()
+
+	// Snapshot under the read lock, write outside it: encoding must see a
+	// stable slice, but the write itself does not need to block readers.
 	m.mux.RLock()
-	defer m.mux.RUnlock()
 	data, err := json.MarshalIndent(m.contracts, "", " ")
+	m.mux.RUnlock()
 	if err != nil {
 		return err
 	}
@@ -173,45 +201,43 @@ func (m *SmartContractsManager) Walk(view func(c *SmartContractInfo)) {
 	m.mux.RUnlock()
 }
 
+// The three lookups below go through the byName / bySymbol indexes that
+// afterLoad maintains, rather than walking the whole contracts slice under a
+// read lock. Semantics are unchanged, including which entry wins for a
+// repeated name/symbol: afterLoad populates the maps in slice order, so the
+// later entry overwrites the earlier one either way.
+
 // GetSmartContractAddressByName finds a contract address by its name.
 func (m *SmartContractsManager) GetSmartContractAddressByName(contractName string) (contractAddress string, err error) {
-	m.Walk(func(c *SmartContractInfo) {
-		if c.Name == contractName {
-			contractAddress = c.ContractAddress
-		}
-	})
-	if contractAddress == "" {
-		err = ErrUnknownContract
+	m.mux.RLock()
+	c, found := m.byName[contractName]
+	m.mux.RUnlock()
+	if !found {
+		return "", ErrUnknownContract
 	}
-	return contractAddress, err
+	return c.ContractAddress, nil
 }
 
 // GetSmartContractAddressByToken finds a contract address by its token symbol.
 func (m *SmartContractsManager) GetSmartContractAddressByToken(symbol string) (contractAddress string, err error) {
-	//symbol = strings.ToLower(symbol)
-	m.Walk(func(c *SmartContractInfo) {
-		//log.Debug("Check", c.Symbol, symbol)
-		if c.Symbol == symbol {
-			contractAddress = c.ContractAddress
-		}
-	})
-	if contractAddress == "" {
-		err = ErrUnknownContract
+	m.mux.RLock()
+	c, found := m.bySymbol[symbol]
+	m.mux.RUnlock()
+	if !found {
+		return "", ErrUnknownContract
 	}
-	return contractAddress, err
+	return c.ContractAddress, nil
 }
 
 // GetSmartContractByToken finds a contract by its token symbol.
 func (m *SmartContractsManager) GetSmartContractByToken(symbol string) (contract *SmartContractInfo, err error) {
-	m.Walk(func(c *SmartContractInfo) {
-		if c.Symbol == symbol {
-			contract = c
-		}
-	})
-	if contract == nil {
-		err = ErrUnknownContract
+	m.mux.RLock()
+	c, found := m.bySymbol[symbol]
+	m.mux.RUnlock()
+	if !found {
+		return nil, ErrUnknownContract
 	}
-	return contract, err
+	return c, nil
 }
 
 // GetSmartContractByAddress finds a contract by its address.

@@ -45,6 +45,14 @@ type SmartContractAbiEntry struct {
 	Type            string                         `json:"type"`
 	Inputs          []*SmartContractAbiEntryInput  `json:"inputs,omitempty"`
 	Outputs         []*SmartContractAbiEntryOutput `json:"outputs,omitempty"`
+
+	// sigOnce guards the lazy computation of Signature and topic0 below, so
+	// concurrent first callers of GetSignature/Topic0 cannot race on the write.
+	sigOnce sync.Once
+	// topic0 caches Topic0()'s full 32-byte hash, filled alongside Signature by
+	// updateSignature so decoding a log does not re-hash the entry's canonical
+	// signature on every call.
+	topic0 [32]byte
 }
 
 type SmartContractAbiEntryInput struct {
@@ -112,50 +120,14 @@ func (e *SmartContractAbiEntry) encodeInputs(params ...interface{}) (data string
 	return data, nil
 }
 
-func (e *SmartContractAbiEntry) encodeInputsBytes(params ...interface{}) (dataBytes []byte, err error) {
-	signature := e.GetSignature()
-	dataBytes = make([]byte, 4)
-	copy(dataBytes, signature[0:4])
-	if len(e.Inputs) != len(params) {
-		return nil, ErrSmartContractMethodParamsCountMismatch
-	}
-	for i, paramEntry := range e.Inputs {
-		inputParam := new(paramInput)
-		param := params[i]
-		switch paramEntry.Type {
-		case "address":
-			addr := param.([]byte)
-			inputParam.SetAddress(addr)
-		case "uint256":
-			inputParam.Data = param.([]byte)
-		case "bool":
-			val := param.(bool)
-			inputParam.SetBool(val)
-		}
-		dataBytes = append(dataBytes, inputParam.Data...)
-	}
-	return dataBytes, nil
-}
-
 func (e *SmartContractAbiEntry) GetSignature() [4]byte {
-	if e._isSignatureEmpty() {
-		e.updateSignature()
-	}
+	e.updateSignature()
 	return e.Signature
 }
 
 func (e *SmartContractAbiEntry) checkSignature(signature [4]byte) bool {
 	for i, b := range e.Signature {
 		if signature[i] != b {
-			return false
-		}
-	}
-	return true
-}
-
-func (e *SmartContractAbiEntry) _isSignatureEmpty() bool {
-	for _, b := range e.Signature {
-		if b != 0 {
 			return false
 		}
 	}
@@ -174,9 +146,17 @@ func (e *SmartContractAbiEntry) String() string {
 	return e.Type + ": " + e.Name + "(" + strings.Join(params, ",") + ")" + strings.Join(output, ",") + ", methodId: 0x" + fmt.Sprintf("%x", e.Signature)
 }
 
+// updateSignature computes Signature (the 4-byte method selector) and topic0
+// (the full 32-byte event-topic hash) from the canonical signature, once. It
+// is idempotent and Once-guarded, so it both fills the cache on first use and
+// establishes the happens-before edge that makes concurrent readers of
+// Signature/topic0 safe.
 func (e *SmartContractAbiEntry) updateSignature() {
-	h := crypto.Keccak256([]byte(e.canonicalSignature()))
-	copy(e.Signature[:], h[:4])
+	e.sigOnce.Do(func() {
+		h := crypto.Keccak256([]byte(e.canonicalSignature()))
+		copy(e.Signature[:], h[:4])
+		copy(e.topic0[:], h)
+	})
 }
 
 // canonicalSignature returns "name(type1,type2,...)" using canonical type
