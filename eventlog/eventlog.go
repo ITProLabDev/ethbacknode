@@ -43,6 +43,12 @@ func (l *ethLog) topics32() ([][32]byte, error) {
 // ethReceipt is the minimal receipt shape eventlog needs.
 type ethReceipt struct {
 	Logs []*ethLog
+
+	// Status and GasUsed are the transaction's outcome, needed for
+	// contractTransaction delivery (unused by log collection, which only
+	// reads Logs).
+	Status  bool
+	GasUsed int64
 }
 
 // logFilter mirrors clients/ethclient.LogFilter for the LogSource interface.
@@ -86,6 +92,13 @@ type Service struct {
 	// from the chain client; a test seam in unit tests.
 	blockTxHashes func(blockNum int64) ([]string, error)
 
+	// txSource, txDecoder and txSink together drive contractTransaction
+	// delivery. All three are optional; contractTransaction work only
+	// happens when txSink is wired (see collectAndDeliverTransactions).
+	txSource  TransactionSource
+	txDecoder TransactionDecoder
+	txSink    TransactionSink
+
 	// subStorage persists event subscriptions (optional).
 	subStorage storage.BinStorage
 
@@ -117,7 +130,10 @@ func New(opts ...Option) *Service {
 func (s *Service) Subscribe(sub *Subscription) { s.subs.add(sub) }
 
 // OnBlock is the watchdog block-listener entry point: collect the block's logs,
-// decode them, and deliver scope-matched events to the sink.
+// decode them, and deliver scope-matched events to the sink. Also delivers
+// contractTransaction notifications when a TransactionSink is wired -- a
+// separate data path (full block transactions, not logs), so a log-collection
+// failure does not block it and vice versa.
 func (s *Service) OnBlock(blockNum int64, blockID string) {
 	addrs := s.subs.addresses()
 	if len(addrs) == 0 {
@@ -126,10 +142,13 @@ func (s *Service) OnBlock(blockNum int64, blockID string) {
 	logs, err := s.collect(blockNum, addrs)
 	if err != nil {
 		log.Error("eventlog: collect block", blockNum, "error:", err)
-		return
+	} else {
+		for _, lg := range logs {
+			s.decodeAndDeliver(lg)
+		}
 	}
-	for _, lg := range logs {
-		s.decodeAndDeliver(lg)
+	if s.txSink != nil {
+		s.collectAndDeliverTransactions(blockNum, addrs)
 	}
 }
 

@@ -1,6 +1,8 @@
 package eventlog
 
 import (
+	"bytes"
+	"math/big"
 	"testing"
 
 	"github.com/ITProLabDev/ethbacknode/abi"
@@ -43,8 +45,12 @@ func TestRawLogSource_GetLogs(t *testing.T) {
 
 func TestRawLogSource_GetTransactionReceipt(t *testing.T) {
 	src := RawLogSource{
-		GetReceiptFn: func(txHash string) ([]RawLog, error) {
-			return []RawLog{{Address: "0xdef", BlockNumber: 4, TransactionHash: txHash, LogIndex: 0}}, nil
+		GetReceiptFn: func(txHash string) (*RawReceipt, error) {
+			return &RawReceipt{
+				Logs:    []RawLog{{Address: "0xdef", BlockNumber: 4, TransactionHash: txHash, LogIndex: 0}},
+				Status:  true,
+				GasUsed: 51000,
+			}, nil
 		},
 	}
 	r, err := src.GetTransactionReceipt("0xt9")
@@ -52,7 +58,53 @@ func TestRawLogSource_GetTransactionReceipt(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(r.Logs) != 1 || r.Logs[0].Address != "0xdef" || r.Logs[0].TransactionHash != "0xt9" {
-		t.Fatalf("receipt not converted: %+v", r)
+		t.Fatalf("receipt logs not converted: %+v", r)
+	}
+	if !r.Status || r.GasUsed != 51000 {
+		t.Fatalf("receipt status/gasUsed not converted: %+v", r)
+	}
+}
+
+func TestRawTransactionSource_GetBlockTransactions(t *testing.T) {
+	src := RawTransactionSource{
+		GetBlockTransactionsFn: func(blockNum int64) ([]RawTransaction, error) {
+			return []RawTransaction{
+				{Hash: "0xtx1", From: "0xfrom", To: "0xto", Value: big.NewInt(7), Gas: 21000, Input: []byte{0xde, 0xad}},
+			}, nil
+		},
+	}
+	txs, err := src.GetBlockTransactions(9)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(txs) != 1 {
+		t.Fatalf("got %d transactions, want 1", len(txs))
+	}
+	tx := txs[0]
+	if tx.Hash != "0xtx1" || tx.From != "0xfrom" || tx.To != "0xto" || tx.Gas != 21000 {
+		t.Fatalf("transaction not converted: %+v", tx)
+	}
+	if tx.Value.Cmp(big.NewInt(7)) != 0 || !bytes.Equal(tx.Input, []byte{0xde, 0xad}) {
+		t.Fatalf("value/input not converted: %+v", tx)
+	}
+}
+
+func TestRawTransactionSource_NilFunc(t *testing.T) {
+	var src RawTransactionSource
+	if _, err := src.GetBlockTransactions(1); err == nil {
+		t.Fatal("nil GetBlockTransactionsFn must error, not panic")
+	}
+}
+
+func TestTransactionDecoderAdapter_DelegatesToManager(t *testing.T) {
+	called := false
+	adapter := NewTransactionDecoder(func(contract string, data []byte) (string, []abi.DecodedValue, error) {
+		called = true
+		return "transfer", []abi.DecodedValue{{Name: "to", Type: "address"}}, nil
+	})
+	method, inputs, err := adapter.DecodeCall("0xabc", []byte{0xa9, 0x05, 0x9c, 0xbb})
+	if err != nil || !called || method != "transfer" || len(inputs) != 1 {
+		t.Fatalf("transaction decoder adapter failed: method=%v inputs=%v err=%v called=%v", method, inputs, err, called)
 	}
 }
 

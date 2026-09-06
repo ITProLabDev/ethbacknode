@@ -16,6 +16,7 @@ import (
 	"github.com/ITProLabDev/ethbacknode/address"
 	"github.com/ITProLabDev/ethbacknode/clients/ethclient"
 	"github.com/ITProLabDev/ethbacknode/clients/txmanager"
+	"github.com/ITProLabDev/ethbacknode/common/hexnum"
 	"github.com/ITProLabDev/ethbacknode/endpoint"
 	"github.com/ITProLabDev/ethbacknode/eventlog"
 	"github.com/ITProLabDev/ethbacknode/presets"
@@ -250,7 +251,7 @@ func main() {
 				}
 				return out, nil
 			},
-			GetReceiptFn: func(txHash string) ([]eventlog.RawLog, error) {
+			GetReceiptFn: func(txHash string) (*eventlog.RawReceipt, error) {
 				r, err := chainClient.GetTransactionReceipt(txHash)
 				if err != nil {
 					return nil, err
@@ -263,7 +264,7 @@ func main() {
 						TransactionIndex: l.TransactionIndex, LogIndex: l.LogIndex, Removed: l.Removed,
 					}
 				}
-				return out, nil
+				return &eventlog.RawReceipt{Logs: out, Status: r.Success(), GasUsed: r.GasUsed}, nil
 			},
 		}),
 		eventlog.WithDecoder(eventlog.NewDecoder(abiManager.DecodeLog)),
@@ -271,6 +272,39 @@ func main() {
 		eventlog.WithAddressCodec(addressCodec),
 		eventlog.WithSubscriptionStorage(eventlogStorage.GetBinFileStorage("subscriptions.json")),
 		eventlog.WithSink(endpoint.NewContractEventSink(
+			endpoint.NotifierFunc(func(serviceID int64, subject string, payload interface{}) {
+				subscriptionsManager.NotifySubscriberRaw(subscriptions.ServiceId(serviceID), subject, payload)
+			}),
+		)),
+		// contractTransaction: every transaction sent directly to a subscribed
+		// contract, decoded by method selector (todo/TASKS.md Milestone 8).
+		// A separate data path from log collection above: fetches the whole
+		// block's transactions rather than logs.
+		eventlog.WithTransactionSource(eventlog.RawTransactionSource{
+			GetBlockTransactionsFn: func(blockNum int64) ([]eventlog.RawTransaction, error) {
+				block, err := chainClient.GetBlockByNumber(blockNum, true)
+				if err != nil {
+					return nil, err
+				}
+				txs, err := block.GetTransactions()
+				if err != nil {
+					return nil, err
+				}
+				out := make([]eventlog.RawTransaction, len(txs))
+				for i, t := range txs {
+					input, ierr := hexnum.ParseHexBytes(t.Input)
+					if ierr != nil {
+						input = nil
+					}
+					out[i] = eventlog.RawTransaction{
+						Hash: t.Hash, From: t.From, To: t.To, Value: t.Value, Gas: t.Gas, Input: input,
+					}
+				}
+				return out, nil
+			},
+		}),
+		eventlog.WithTransactionDecoder(eventlog.NewTransactionDecoder(abiManager.DecodeCall)),
+		eventlog.WithTransactionSink(endpoint.NewContractTransactionSink(
 			endpoint.NotifierFunc(func(serviceID int64, subject string, payload interface{}) {
 				subscriptionsManager.NotifySubscriberRaw(subscriptions.ServiceId(serviceID), subject, payload)
 			}),

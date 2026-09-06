@@ -363,12 +363,65 @@ than mis-encoding. `go test ./eventlog/ ./endpoint/ ./abi/ -race` clean,
 
 ---
 
+## Milestone 8 — `contractTransaction` delivery (`eventlog/`, `endpoint/`) — ✅ DONE (2026-09-06)
+
+**Goal:** notify a contract subscriber about the actual transactions sent to
+the subscribed contract, not only the events it emitted — a transaction that
+reverted, or that calls a method with no logs, is invisible to `contractEvent`
+today. Agreed with the user (2026-09-06):
+
+- New notification type `contractTransaction`, delivered through the **same**
+  subscription as `contractEvent` (`{serviceId, contractAddress, scope}`) —
+  subscribing to a contract yields both.
+- **Payload is decoded, not raw calldata**: look up the method by its 4-byte
+  selector (`tx.Input[:4]`) against the contract's registered ABI and decode
+  the inputs (`abi.SmartContractAbiEntry.DecodeInputsTyped`) the same way
+  `contractCall`/`contractEvent` already do — reuses existing decode machinery,
+  nothing new to build there. Unlike `contractEvent` (which skips a log
+  matching no known event), a transaction is **never silently skipped for
+  being undecodable**: when the selector matches no known method, the
+  `method` field carries the raw 4-byte selector as hex (e.g. `"0xa9059cbb"`)
+  instead of a decoded name, with no decoded inputs. The raw calldata is
+  **always** included too (`data`, 0x-hex), decoded or not — a subscriber can
+  decode an unknown selector itself, or double-check a decoded one.
+- **Scope for v1: `whole_contract` only.** `managed_only` for a raw transaction
+  (`tx.From`/`tx.To` against the managed-address pool, analogous to what
+  `watchdog` already does for plain transfers) is deferred — see Future Phases.
+
+**Delivered as** a data path independent of `ModeGetLogs`/`ModeReceipts` (it
+turned out not to need the latter): `eventlog.Service` gained
+`TransactionSource`/`TransactionDecoder`/`TransactionSink` seams, all
+optional — `OnBlock` only fetches block transactions when a `TransactionSink`
+is wired, so a deployment that only wants `contractEvent` pays nothing extra.
+`abi.SmartContractsManager.DecodeCall` (new, `abi/decodecall.go`) identifies
+the method by its 4-byte selector and decodes via the existing
+`DecodeInputsTyped`, returning the raw hex selector (never an error) when it
+matches no known method. `endpoint.NewContractTransactionSink` (new) builds
+the `contractTransaction` JSON-RPC notification, `Value` as a decimal string
+like `contractEvent`'s `Inputs`. Wired in `main.go` via
+`chainClient.GetBlockByNumber(num, true)` (one extra call per block, only
+when some contract is subscribed) plus a receipt fetch per matched
+transaction (the existing `GetTransactionReceipt` seam, extended with
+`Status`/`GasUsed`). 20 new tests across `abi`/`eventlog`/`endpoint`, green
+under `-race`; not additionally verified against a live node (unlike the
+EIP-1559 signer above), since every collaborator here is internal Go already
+covered by fakes matching the real interfaces.
+
+---
+
 ## Future Phases (recorded, out of current scope)
 
 - **Write support:** sign + broadcast arbitrary contract methods from a managed
   address (generalize `send_methods.go`), gas/nonce handling for contract calls.
+  *(Nonce allocation and EIP-1559 signing landed 2026-09-06 —
+  `clients/txmanager`, `crypto.EthDynamicFeeTxSigner` — but only for plain
+  coin transfers; generalizing to arbitrary contract-write methods is still
+  open.)*
 - **EIP-712** typed-data signing for CLOB orders (`OrderFilled`/`OrdersMatched`).
-- **EIP-1559** transaction type support.
+- **Contract subscription filters:** `managed_only` scope for
+  `contractTransaction` (M8); per-event-name and per-argument-value filtering
+  for both `contractEvent` and `contractTransaction` (today it's binary:
+  everything from a contract, or nothing more specific than that).
 - **CTF write methods:** `splitPosition`, `mergePositions`, `redeemPositions`.
 - **Polymarket domain model:** markets, conditions, outcome tokens, position P&L.
 

@@ -11,13 +11,19 @@ import (
 type fakeLogSource struct {
 	logs       []*ethLog
 	lastFilter logFilter
+	receipts   map[string]*ethReceipt // keyed by tx hash; unset -> (nil, nil)
 }
 
 func (f *fakeLogSource) GetLogs(filter logFilter) ([]*ethLog, error) {
 	f.lastFilter = filter
 	return f.logs, nil
 }
-func (f *fakeLogSource) GetTransactionReceipt(string) (*ethReceipt, error) { return nil, nil }
+func (f *fakeLogSource) GetTransactionReceipt(hash string) (*ethReceipt, error) {
+	if f.receipts == nil {
+		return nil, nil
+	}
+	return f.receipts[hash], nil
+}
 
 // fakeDecoder decodes a log into a fixed event keyed by the contract address.
 type fakeDecoder struct{ events map[string]*abi.DecodedEvent }
