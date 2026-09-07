@@ -244,3 +244,119 @@ func TestService_OnBlock_NoTransactionSinkDoesNoTransactionWork(t *testing.T) {
 		t.Fatalf("GetBlockTransactions called %d times with no TransactionSink wired, want 0", txSrc.calls)
 	}
 }
+
+var transferSelector = [4]byte{0xa9, 0x05, 0x9c, 0xbb}
+
+func TestService_OnBlock_SelectorFilterAdmitsAMatchingTransaction(t *testing.T) {
+	addr := "0xabc0000000000000000000000000000000000001"
+	calldata := append(append([]byte{}, transferSelector[:]...), make([]byte, 64)...)
+	txSrc := &fakeTransactionSource{txs: []*ethTransaction{
+		{Hash: "0xtx1", To: addr, Value: big.NewInt(0), Input: calldata},
+	}}
+	logSrc := &fakeLogSource{receipts: map[string]*ethReceipt{"0xtx1": {Status: true}}}
+	dec := &fakeTransactionDecoder{method: "transfer"}
+
+	var got []*ContractTransaction
+	sink := func(ct *ContractTransaction) { got = append(got, ct) }
+
+	svc := New(
+		WithLogSource(logSrc), WithDecoder(&fakeDecoder{}),
+		WithTransactionSource(txSrc), WithTransactionDecoder(dec), WithTransactionSink(sink),
+		WithSink(func(*ContractEvent) {}), WithConfig(DefaultConfig()),
+	)
+	svc.Subscribe(&Subscription{
+		ServiceID: "s1", ContractAddress: addr, Scope: ScopeWholeContract,
+		Selectors: [][4]byte{transferSelector},
+	})
+
+	svc.OnBlock(1, "0xblock")
+
+	if len(got) != 1 {
+		t.Fatalf("delivered %d contractTransactions, want 1 (the selector is in the filter)", len(got))
+	}
+}
+
+func TestService_OnBlock_SelectorFilterRejectsANonMatchingTransaction(t *testing.T) {
+	addr := "0xabc0000000000000000000000000000000000001"
+	otherSelector := []byte{0x11, 0x22, 0x33, 0x44}
+	calldata := append(append([]byte{}, otherSelector...), make([]byte, 64)...)
+	txSrc := &fakeTransactionSource{txs: []*ethTransaction{
+		{Hash: "0xtx1", To: addr, Value: big.NewInt(0), Input: calldata},
+	}}
+	logSrc := &fakeLogSource{receipts: map[string]*ethReceipt{"0xtx1": {Status: true}}}
+	dec := &fakeTransactionDecoder{method: "0x11223344"}
+
+	var got []*ContractTransaction
+	sink := func(ct *ContractTransaction) { got = append(got, ct) }
+
+	svc := New(
+		WithLogSource(logSrc), WithDecoder(&fakeDecoder{}),
+		WithTransactionSource(txSrc), WithTransactionDecoder(dec), WithTransactionSink(sink),
+		WithSink(func(*ContractEvent) {}), WithConfig(DefaultConfig()),
+	)
+	svc.Subscribe(&Subscription{
+		ServiceID: "s1", ContractAddress: addr, Scope: ScopeWholeContract,
+		Selectors: [][4]byte{transferSelector}, // does not include otherSelector
+	})
+
+	svc.OnBlock(1, "0xblock")
+
+	if len(got) != 0 {
+		t.Fatalf("delivered %d contractTransactions, want 0 (the selector is not in the filter)", len(got))
+	}
+}
+
+// A plain value transfer carries no calldata at all, so a filtered
+// subscription -- which is asking for specific operations -- has nothing to
+// match against and must not receive it. An unfiltered subscription still
+// does (existing behavior, unchanged).
+func TestService_OnBlock_SelectorFilterRejectsAPlainValueTransfer(t *testing.T) {
+	addr := "0xabc0000000000000000000000000000000000001"
+	txSrc := &fakeTransactionSource{txs: []*ethTransaction{
+		{Hash: "0xtx1", To: addr, Value: big.NewInt(5), Input: nil},
+	}}
+	logSrc := &fakeLogSource{receipts: map[string]*ethReceipt{"0xtx1": {Status: true}}}
+
+	var got []*ContractTransaction
+	sink := func(ct *ContractTransaction) { got = append(got, ct) }
+
+	svc := New(
+		WithLogSource(logSrc), WithDecoder(&fakeDecoder{}),
+		WithTransactionSource(txSrc), WithTransactionDecoder(&fakeTransactionDecoder{}), WithTransactionSink(sink),
+		WithSink(func(*ContractEvent) {}), WithConfig(DefaultConfig()),
+	)
+	svc.Subscribe(&Subscription{
+		ServiceID: "s1", ContractAddress: addr, Scope: ScopeWholeContract,
+		Selectors: [][4]byte{transferSelector},
+	})
+
+	svc.OnBlock(1, "0xblock")
+
+	if len(got) != 0 {
+		t.Fatalf("delivered %d contractTransactions for a no-calldata transfer under a selector filter, want 0", len(got))
+	}
+}
+
+func TestService_OnBlock_NoSelectorFilterAdmitsEveryTransaction(t *testing.T) {
+	addr := "0xabc0000000000000000000000000000000000001"
+	txSrc := &fakeTransactionSource{txs: []*ethTransaction{
+		{Hash: "0xtx1", To: addr, Value: big.NewInt(5), Input: nil}, // plain transfer
+	}}
+	logSrc := &fakeLogSource{receipts: map[string]*ethReceipt{"0xtx1": {Status: true}}}
+
+	var got []*ContractTransaction
+	sink := func(ct *ContractTransaction) { got = append(got, ct) }
+
+	svc := New(
+		WithLogSource(logSrc), WithDecoder(&fakeDecoder{}),
+		WithTransactionSource(txSrc), WithTransactionDecoder(&fakeTransactionDecoder{}), WithTransactionSink(sink),
+		WithSink(func(*ContractEvent) {}), WithConfig(DefaultConfig()),
+	)
+	svc.Subscribe(&Subscription{ServiceID: "s1", ContractAddress: addr, Scope: ScopeWholeContract}) // no Selectors
+
+	svc.OnBlock(1, "0xblock")
+
+	if len(got) != 1 {
+		t.Fatalf("delivered %d contractTransactions with no filter configured, want 1 (unfiltered matches everything)", len(got))
+	}
+}

@@ -33,20 +33,21 @@ func (f *fakeAdder) AddContractFromABI(name, symbol, address string, rawABI []by
 
 type fakeSubscriber struct {
 	gotService, gotAddr, gotScope string
+	gotSelectors                  [][4]byte
 	unsubService, unsubAddr       string
 	err                           error
-	subs                          []map[string]string
+	subs                          []map[string]any
 }
 
-func (f *fakeSubscriber) SubscribeAndSaveStrings(serviceID, contractAddress, scope string) error {
-	f.gotService, f.gotAddr, f.gotScope = serviceID, contractAddress, scope
+func (f *fakeSubscriber) SubscribeAndSaveStrings(serviceID, contractAddress, scope string, selectors [][4]byte) error {
+	f.gotService, f.gotAddr, f.gotScope, f.gotSelectors = serviceID, contractAddress, scope, selectors
 	return f.err
 }
 func (f *fakeSubscriber) UnsubscribeStrings(serviceID, contractAddress string) error {
 	f.unsubService, f.unsubAddr = serviceID, contractAddress
 	return f.err
 }
-func (f *fakeSubscriber) ListSubscriptions() []map[string]string { return f.subs }
+func (f *fakeSubscriber) ListSubscriptions() []map[string]any { return f.subs }
 
 // fakeReq/fakeResp implement RpcRequest/RpcResponse for processor tests.
 type fakeReq struct{ params interface{} }
@@ -124,6 +125,122 @@ func TestContractSubscribe_RegistersSubscription(t *testing.T) {
 	}
 	if sub.gotService != "7" || sub.gotAddr != "0xabc" || sub.gotScope != "managed_only" {
 		t.Fatalf("subscriber got %q %q %q", sub.gotService, sub.gotAddr, sub.gotScope)
+	}
+}
+
+// A subscriber can name a raw 4-byte hex selector directly -- works even for
+// a method not in this node's registered ABI, since it needs no lookup.
+func TestContractSubscribe_ResolvesRawSelectors(t *testing.T) {
+	sub := &fakeSubscriber{}
+	reg := &fakeRegistry{known: map[string]bool{"0xabc": true}}
+	r := &BackRpc{eventLog: sub, abiManager: reg}
+	req := &fakeReq{params: map[string]interface{}{
+		"serviceId": 7, "address": "0xabc", "scope": "whole_contract",
+		"selectors": []string{"0xa9059cbb"},
+	}}
+	resp := &fakeResp{}
+	r.rpcProcessContractSubscribe(nil, req, resp)
+	if resp.hasError {
+		t.Fatalf("unexpected error: %s", resp.errMsg)
+	}
+	want := [4]byte{0xa9, 0x05, 0x9c, 0xbb}
+	if len(sub.gotSelectors) != 1 || sub.gotSelectors[0] != want {
+		t.Fatalf("selectors=%x want [%x]", sub.gotSelectors, want)
+	}
+}
+
+// A subscriber can instead name a canonical signature, resolved to its
+// selector the same way abi's own signature hashing does -- no ABI lookup
+// needed, so this works for any signature the caller knows, registered or not.
+func TestContractSubscribe_ResolvesCanonicalMethodSignatures(t *testing.T) {
+	sub := &fakeSubscriber{}
+	reg := &fakeRegistry{known: map[string]bool{"0xabc": true}}
+	r := &BackRpc{eventLog: sub, abiManager: reg}
+	req := &fakeReq{params: map[string]interface{}{
+		"serviceId": 7, "address": "0xabc", "scope": "whole_contract",
+		"methods": []string{"transfer(address,uint256)"},
+	}}
+	resp := &fakeResp{}
+	r.rpcProcessContractSubscribe(nil, req, resp)
+	if resp.hasError {
+		t.Fatalf("unexpected error: %s", resp.errMsg)
+	}
+	want := [4]byte{0xa9, 0x05, 0x9c, 0xbb}
+	if len(sub.gotSelectors) != 1 || sub.gotSelectors[0] != want {
+		t.Fatalf("selectors=%x want [%x]", sub.gotSelectors, want)
+	}
+}
+
+// Both forms together (the hybrid) merge into one filter set.
+func TestContractSubscribe_MergesSelectorsAndMethods(t *testing.T) {
+	sub := &fakeSubscriber{}
+	reg := &fakeRegistry{known: map[string]bool{"0xabc": true}}
+	r := &BackRpc{eventLog: sub, abiManager: reg}
+	req := &fakeReq{params: map[string]interface{}{
+		"serviceId": 7, "address": "0xabc", "scope": "whole_contract",
+		"selectors": []string{"0xdeadbeef"},
+		"methods":   []string{"transfer(address,uint256)"},
+	}}
+	resp := &fakeResp{}
+	r.rpcProcessContractSubscribe(nil, req, resp)
+	if resp.hasError {
+		t.Fatalf("unexpected error: %s", resp.errMsg)
+	}
+	if len(sub.gotSelectors) != 2 {
+		t.Fatalf("selectors=%x want 2 entries", sub.gotSelectors)
+	}
+}
+
+// No selectors/methods named at all must mean no filter (nil), not an empty
+// slice that would (mis)match nothing -- preserving today's behavior for a
+// caller that never asks for filtering.
+func TestContractSubscribe_NoSelectorsMeansNoFilter(t *testing.T) {
+	sub := &fakeSubscriber{}
+	reg := &fakeRegistry{known: map[string]bool{"0xabc": true}}
+	r := &BackRpc{eventLog: sub, abiManager: reg}
+	req := &fakeReq{params: map[string]interface{}{
+		"serviceId": 7, "address": "0xabc", "scope": "whole_contract",
+	}}
+	resp := &fakeResp{}
+	r.rpcProcessContractSubscribe(nil, req, resp)
+	if resp.hasError {
+		t.Fatalf("unexpected error: %s", resp.errMsg)
+	}
+	if sub.gotSelectors != nil {
+		t.Fatalf("selectors=%x want nil (no filter)", sub.gotSelectors)
+	}
+}
+
+func TestContractSubscribe_RejectsMalformedSelector(t *testing.T) {
+	sub := &fakeSubscriber{}
+	reg := &fakeRegistry{known: map[string]bool{"0xabc": true}}
+	r := &BackRpc{eventLog: sub, abiManager: reg}
+	req := &fakeReq{params: map[string]interface{}{
+		"serviceId": 7, "address": "0xabc", "scope": "whole_contract",
+		"selectors": []string{"not-hex"},
+	}}
+	resp := &fakeResp{}
+	r.rpcProcessContractSubscribe(nil, req, resp)
+	if !resp.hasError {
+		t.Fatal("a malformed selector must be rejected")
+	}
+	if sub.gotAddr != "" {
+		t.Fatalf("subscriber must not be called on a malformed selector, got addr=%q", sub.gotAddr)
+	}
+}
+
+func TestContractSubscribe_RejectsSelectorOfWrongLength(t *testing.T) {
+	sub := &fakeSubscriber{}
+	reg := &fakeRegistry{known: map[string]bool{"0xabc": true}}
+	r := &BackRpc{eventLog: sub, abiManager: reg}
+	req := &fakeReq{params: map[string]interface{}{
+		"serviceId": 7, "address": "0xabc", "scope": "whole_contract",
+		"selectors": []string{"0xa9059c"}, // 3 bytes, not 4
+	}}
+	resp := &fakeResp{}
+	r.rpcProcessContractSubscribe(nil, req, resp)
+	if !resp.hasError {
+		t.Fatal("a 3-byte selector must be rejected")
 	}
 }
 

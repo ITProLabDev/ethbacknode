@@ -1,7 +1,11 @@
 package endpoint
 
 import (
+	"fmt"
 	"strconv"
+
+	"github.com/ITProLabDev/ethbacknode/abi"
+	"github.com/ITProLabDev/ethbacknode/common/hexnum"
 )
 
 // rpcProcessContractRegister registers a contract + ABI. params:
@@ -42,8 +46,21 @@ func (r *BackRpc) rpcProcessContractList(ctx RequestContext, request RpcRequest,
 	response.SetResult(r.abiManager.GetSmartContractList())
 }
 
-// rpcProcessContractSubscribe subscribes a service to a contract's events.
-// params: {serviceId (number), address, scope (whole_contract|managed_only)}.
+// rpcProcessContractSubscribe subscribes a service to a contract's events and
+// transactions. params: {serviceId (number), address,
+// scope (whole_contract|managed_only), selectors ([]string, optional),
+// methods ([]string, optional)}.
+//
+// selectors and methods both narrow contractTransaction delivery to specific
+// operations (contractEvent is unaffected) and may be combined -- a hybrid,
+// since they serve different callers: selectors are raw 4-byte hex (e.g.
+// "0xa9059cbb") and work even for a method not in this node's registered ABI,
+// since matching needs only the 4 bytes observed on-chain, no lookup; methods
+// are canonical signatures (e.g. "transfer(address,uint256)"), resolved to
+// their selector the same way abi's own signature hashing works -- also no
+// ABI lookup needed, just more ergonomic when the caller knows the signature
+// by name. Neither given means no filter: every transaction to the contract
+// matches, unchanged from before this existed.
 //
 // serviceId is a JSON number. The secured wrapper authenticates it via
 // GetParamInt and requires the subscriber to already exist (and rejects the
@@ -52,9 +69,11 @@ func (r *BackRpc) rpcProcessContractList(ctx RequestContext, request RpcRequest,
 // the event back to the same subscriptions.Manager serviceId.
 func (r *BackRpc) rpcProcessContractSubscribe(ctx RequestContext, request RpcRequest, response RpcResponse) {
 	type params struct {
-		ServiceID int64  `json:"serviceId"`
-		Address   string `json:"address"`
-		Scope     string `json:"scope"`
+		ServiceID int64    `json:"serviceId"`
+		Address   string   `json:"address"`
+		Scope     string   `json:"scope"`
+		Selectors []string `json:"selectors"`
+		Methods   []string `json:"methods"`
 	}
 	p := &params{}
 	if err := request.ParseParams(p); err != nil {
@@ -81,12 +100,44 @@ func (r *BackRpc) rpcProcessContractSubscribe(ctx RequestContext, request RpcReq
 		response.SetError(ERROR_CODE_INVALID_REQUEST, "unknown contract: register its ABI before subscribing")
 		return
 	}
+	selectors, err := resolveSelectors(p.Selectors, p.Methods)
+	if err != nil {
+		response.SetError(ERROR_CODE_INVALID_REQUEST, err.Error())
+		return
+	}
 	serviceID := strconv.FormatInt(p.ServiceID, 10)
-	if err := r.eventLog.SubscribeAndSaveStrings(serviceID, p.Address, p.Scope); err != nil {
+	if err := r.eventLog.SubscribeAndSaveStrings(serviceID, p.Address, p.Scope, selectors); err != nil {
 		response.SetError(ERROR_CODE_INVALID_REQUEST, err.Error())
 		return
 	}
 	response.SetResult(map[string]interface{}{"serviceId": p.ServiceID, "address": p.Address, "scope": p.Scope, "status": "subscribed"})
+}
+
+// resolveSelectors merges raw hex selectors and canonical method signatures
+// into one selector set for a contractTransaction filter. Returns nil (no
+// filter) when both are empty, never an empty non-nil slice, so a caller
+// that names nothing keeps today's unfiltered behavior.
+func resolveSelectors(rawHex, signatures []string) ([][4]byte, error) {
+	if len(rawHex) == 0 && len(signatures) == 0 {
+		return nil, nil
+	}
+	out := make([][4]byte, 0, len(rawHex)+len(signatures))
+	for _, h := range rawHex {
+		b, err := hexnum.ParseHexBytes(h)
+		if err != nil {
+			return nil, fmt.Errorf("selectors: %q: %w", h, err)
+		}
+		if len(b) != 4 {
+			return nil, fmt.Errorf("selectors: %q is %d bytes, want 4", h, len(b))
+		}
+		var sel [4]byte
+		copy(sel[:], b)
+		out = append(out, sel)
+	}
+	for _, sig := range signatures {
+		out = append(out, abi.Selector(sig))
+	}
+	return out, nil
 }
 
 // rpcProcessContractUnsubscribe removes a service's subscription to a contract.

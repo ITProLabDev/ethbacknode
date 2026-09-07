@@ -111,7 +111,7 @@ func TestE2E_ContractTransaction_DeliveredEndToEnd(t *testing.T) {
 
 	t.Run("whole_contract delivers the decoded call with safe JSON", func(t *testing.T) {
 		svc, captured, mu := buildTransactionService(abiManager, []eventlog.RawTransaction{tx}, receipts)
-		if err := svc.SubscribeAndSaveStrings("42", contractAddr, "whole_contract"); err != nil {
+		if err := svc.SubscribeAndSaveStrings("42", contractAddr, "whole_contract", nil); err != nil {
 			t.Fatalf("subscribe: %v", err)
 		}
 		svc.OnBlock(20123456, "0xblock")
@@ -174,7 +174,7 @@ func TestE2E_ContractTransaction_DeliveredEndToEnd(t *testing.T) {
 		badTx := eventlog.RawTransaction{Hash: "0xtx2", From: tx.From, To: contractAddr, Value: big.NewInt(0), Gas: 21000, Input: unknown}
 		svc, captured, mu := buildTransactionService(abiManager, []eventlog.RawTransaction{badTx},
 			map[string]eventlog.RawReceipt{"0xtx2": {Status: true}})
-		if err := svc.SubscribeAndSaveStrings("42", contractAddr, "whole_contract"); err != nil {
+		if err := svc.SubscribeAndSaveStrings("42", contractAddr, "whole_contract", nil); err != nil {
 			t.Fatalf("subscribe: %v", err)
 		}
 		svc.OnBlock(1, "0xblock")
@@ -210,7 +210,7 @@ func TestE2E_ContractTransaction_DeliveredEndToEnd(t *testing.T) {
 
 	t.Run("managed_only subscription does not receive contractTransaction", func(t *testing.T) {
 		svc, captured, mu := buildTransactionService(abiManager, []eventlog.RawTransaction{tx}, receipts)
-		if err := svc.SubscribeAndSaveStrings("43", contractAddr, "managed_only"); err != nil {
+		if err := svc.SubscribeAndSaveStrings("43", contractAddr, "managed_only", nil); err != nil {
 			t.Fatalf("subscribe: %v", err)
 		}
 		svc.OnBlock(20123456, "0xblock")
@@ -219,6 +219,61 @@ func TestE2E_ContractTransaction_DeliveredEndToEnd(t *testing.T) {
 		defer mu.Unlock()
 		if len(*captured) != 0 {
 			t.Fatalf("managed_only must not receive contractTransaction today, got %d", len(*captured))
+		}
+	})
+
+	t.Run("selector filter admits only the subscribed operation", func(t *testing.T) {
+		// A second, unrelated method call to the same contract in the same
+		// block -- the filter must let the transfer through and hold this one
+		// back, not just react to there being only one transaction.
+		other, err := func() ([]byte, error) {
+			e, err := contract.Abi.GetMethodByName("transfer")
+			if err != nil {
+				return nil, err
+			}
+			// Reuse transfer's selector-shaped calldata but corrupt the
+			// selector itself so it is unambiguously a different operation.
+			raw, err := e.EncodeInputsTyped(to, big.NewInt(1))
+			if err != nil {
+				return nil, err
+			}
+			raw[0] ^= 0xff
+			return raw, nil
+		}()
+		if err != nil {
+			t.Fatalf("build other calldata: %v", err)
+		}
+		otherTx := eventlog.RawTransaction{Hash: "0xtx3", From: tx.From, To: contractAddr, Value: big.NewInt(0), Gas: 21000, Input: other}
+
+		svc, captured, mu := buildTransactionService(abiManager,
+			[]eventlog.RawTransaction{tx, otherTx},
+			map[string]eventlog.RawReceipt{"0xtx1": {Status: true}, "0xtx3": {Status: true}})
+		// The RPC-facing resolution path: a canonical signature, exactly as
+		// contractSubscribe's "methods" param would resolve it.
+		if err := svc.SubscribeAndSaveStrings("44", contractAddr, "whole_contract",
+			[][4]byte{abi.Selector("transfer(address,uint256)")}); err != nil {
+			t.Fatalf("subscribe: %v", err)
+		}
+		svc.OnBlock(1, "0xblock")
+
+		mu.Lock()
+		got := append([]capturedTx{}, (*captured)...)
+		mu.Unlock()
+		if len(got) != 1 {
+			t.Fatalf("delivered %d contractTransactions, want 1 (only the transfer matches the filter)", len(got))
+		}
+		b, err := json.Marshal(got[0].payload)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var wire struct {
+			TxHash string `json:"txHash"`
+		}
+		if err := json.Unmarshal(b, &wire); err != nil {
+			t.Fatal(err)
+		}
+		if wire.TxHash != "0xtx1" {
+			t.Fatalf("txHash=%q want 0xtx1 (the transfer, not the other operation)", wire.TxHash)
 		}
 	})
 }

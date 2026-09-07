@@ -417,6 +417,49 @@ notification types, no separate subscribe endpoint).
 decoded call, an unknown selector, and confirming `managed_only` does not
 receive it.
 
+### Milestone 8.1 — `contractTransaction` operation filter — ✅ DONE (2026-09-07)
+
+Agreed with the user: of the two filtering gaps M8 deferred, **per-operation
+filtering** (not `managed_only` for transactions) comes first — it solves the
+sharper problem (noise from a busy contract) and needs no populated
+managed-address pool. Decisions from the discussion:
+
+- **Filter by 4-byte selector, never by decoded method name** — two
+  differently-typed overloads of one name (`transfer(address,uint256)` vs
+  `transfer(address,uint256,bytes)`) are two different selectors; a name-only
+  filter would be ambiguous between them. New `abi.Selector(canonicalSignature
+  string) [4]byte` computes one without needing an ABI entry — a pure
+  keccak256 hash, the same one `SmartContractAbiEntry.updateSignature` uses
+  internally.
+- **A hybrid, both forms accepted at `contractSubscribe`:** `selectors`
+  (raw `0x`-hex 4-byte values — works even for a method not in this node's
+  registered ABI) and `methods` (canonical signatures, e.g.
+  `"transfer(address,uint256)"`, resolved via `abi.Selector` — no ABI lookup
+  needed either, just friendlier). Both may be given together and merge into
+  one filter set (`endpoint.resolveSelectors`).
+- **A list**, not one selector per subscription — subscribing separately per
+  operation was rejected as impractical.
+- No filter named (the default) means unfiltered, unchanged from before this
+  existed. A plain value transfer (no calldata) never matches a *filtered*
+  subscription — there is no selector to filter on — but still matches an
+  unfiltered one.
+
+`eventlog.Subscription` gained `Selectors [][4]byte`, checked in
+`decodeAndDeliverTransaction` against each transaction's raw selector before
+delivery (matching happens whether or not the call decodes — filtering is on
+the raw bytes, decoding is a separate, later step). Persisted as `0x`-hex in
+`persistedSub.Selectors` and round-trips through a restart.
+`ListSubscriptions`'s per-entry map gained a `selectors` field (`[]string`,
+always present, empty when unfiltered) — its return type changed from
+`map[string]string` to `map[string]any` to carry it.
+
+`API.md`: new `### Filtering contractTransaction by operation` section under
+`contractSubscribe`, updated parameter/error tables and the
+`contractSubscriptions` result shape. 20 new tests across
+`abi`/`eventlog`/`endpoint` (including a full RPC-facing end-to-end case:
+two different operations to one contract in one block, only the subscribed
+one delivered), green under `-race`.
+
 ---
 
 ## Future Phases (recorded, out of current scope)
@@ -428,10 +471,12 @@ receive it.
   coin transfers; generalizing to arbitrary contract-write methods is still
   open.)*
 - **EIP-712** typed-data signing for CLOB orders (`OrderFilled`/`OrdersMatched`).
-- **Contract subscription filters:** `managed_only` scope for
-  `contractTransaction` (M8); per-event-name and per-argument-value filtering
-  for both `contractEvent` and `contractTransaction` (today it's binary:
-  everything from a contract, or nothing more specific than that).
+- **Contract subscription filters, remaining:** `managed_only` scope for
+  `contractTransaction` (M8 — matched on `from`/`to` against the managed pool,
+  analogous to `watchdog`'s plain-transfer tracking); per-event-name and
+  per-argument-value filtering for `contractEvent` (`contractTransaction` got
+  its operation filter in M8.1 — this is the equivalent still missing on the
+  event side).
 - **CTF write methods:** `splitPosition`, `mergePositions`, `redeemPositions`.
 - **Polymarket domain model:** markets, conditions, outcome tokens, position P&L.
 

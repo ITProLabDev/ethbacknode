@@ -1,16 +1,53 @@
 package eventlog
 
 import (
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
+	"strings"
 
 	"github.com/ITProLabDev/ethbacknode/storage"
 )
 
-// persistedSub is the JSON form of a subscription (Scope as its string name).
+// persistedSub is the JSON form of a subscription (Scope as its string name,
+// Selectors as 0x-hex strings).
 type persistedSub struct {
-	ServiceID       string `json:"serviceId"`
-	ContractAddress string `json:"contractAddress"`
-	Scope           string `json:"scope"`
+	ServiceID       string   `json:"serviceId"`
+	ContractAddress string   `json:"contractAddress"`
+	Scope           string   `json:"scope"`
+	Selectors       []string `json:"selectors,omitempty"`
+}
+
+// formatSelectors renders selectors as 0x-hex strings for persistence.
+func formatSelectors(sels [][4]byte) []string {
+	if len(sels) == 0 {
+		return nil
+	}
+	out := make([]string, len(sels))
+	for i, s := range sels {
+		out[i] = "0x" + hex.EncodeToString(s[:])
+	}
+	return out
+}
+
+// parseSelectors parses persisted 0x-hex selector strings back into [4]byte
+// values, rejecting anything that is not exactly 4 bytes of hex.
+func parseSelectors(hexes []string) ([][4]byte, error) {
+	if len(hexes) == 0 {
+		return nil, nil
+	}
+	out := make([][4]byte, len(hexes))
+	for i, h := range hexes {
+		b, err := hex.DecodeString(strings.TrimPrefix(h, "0x"))
+		if err != nil {
+			return nil, fmt.Errorf("eventlog: selector %q: %w", h, err)
+		}
+		if len(b) != 4 {
+			return nil, fmt.Errorf("eventlog: selector %q is %d bytes, want 4", h, len(b))
+		}
+		copy(out[i][:], b)
+	}
+	return out, nil
 }
 
 // WithSubscriptionStorage sets the storage backend used to persist event
@@ -39,6 +76,7 @@ func (s *Service) saveSubscriptions() error {
 			ServiceID:       sub.ServiceID,
 			ContractAddress: sub.ContractAddress,
 			Scope:           scopeName(sub.Scope),
+			Selectors:       formatSelectors(sub.Selectors),
 		}
 	}
 	data, err := json.MarshalIndent(out, "", "  ")
@@ -71,7 +109,14 @@ func (s *Service) LoadSubscriptions() error {
 		if err != nil {
 			return err
 		}
-		s.subs.add(&Subscription{ServiceID: p.ServiceID, ContractAddress: p.ContractAddress, Scope: scope})
+		selectors, err := parseSelectors(p.Selectors)
+		if err != nil {
+			return err
+		}
+		s.subs.add(&Subscription{
+			ServiceID: p.ServiceID, ContractAddress: p.ContractAddress, Scope: scope,
+			Selectors: selectors,
+		})
 	}
 	return nil
 }

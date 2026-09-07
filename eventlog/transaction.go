@@ -98,13 +98,20 @@ func (s *Service) collectAndDeliverTransactions(blockNum int64, addrs []string) 
 }
 
 // decodeAndDeliverTransaction decodes one transaction's calldata and
-// delivers it to every whole_contract subscription for its recipient.
+// delivers it to every whole_contract subscription for its recipient whose
+// selector filter (if any) admits it.
 func (s *Service) decodeAndDeliverTransaction(blockNum int64, tx *ethTransaction) {
+	sel, hasSelector := selectorOf(tx.Input)
+
 	var targets []*Subscription
 	for _, sub := range s.subs.forAddress(tx.To) {
-		if sub.Scope == ScopeWholeContract {
-			targets = append(targets, sub)
+		if sub.Scope != ScopeWholeContract {
+			continue
 		}
+		if !selectorMatches(sub.Selectors, sel, hasSelector) {
+			continue
+		}
+		targets = append(targets, sub)
 	}
 	if len(targets) == 0 {
 		return
@@ -145,4 +152,35 @@ func (s *Service) decodeAndDeliverTransaction(blockNum int64, tx *ethTransaction
 			Data:            tx.Input,
 		})
 	}
+}
+
+// selectorOf returns a transaction's method selector -- the first 4 bytes of
+// its calldata -- and whether it has one at all. A plain value transfer
+// (empty or short Input) has none.
+func selectorOf(input []byte) (sel [4]byte, ok bool) {
+	if len(input) < 4 {
+		return sel, false
+	}
+	copy(sel[:], input[:4])
+	return sel, true
+}
+
+// selectorMatches reports whether a subscription's selector filter admits a
+// transaction. No filter configured (the common case) matches everything,
+// unchanged from before selector filtering existed. A filtered subscription
+// is asking for specific operations, so a transaction with no selector at
+// all -- a plain value transfer -- never matches one.
+func selectorMatches(filter [][4]byte, sel [4]byte, hasSelector bool) bool {
+	if len(filter) == 0 {
+		return true
+	}
+	if !hasSelector {
+		return false
+	}
+	for _, want := range filter {
+		if want == sel {
+			return true
+		}
+	}
+	return false
 }

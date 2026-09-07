@@ -189,7 +189,7 @@ func TestE2E_ContractEvent_DeliveredEndToEnd(t *testing.T) {
 			eventlog.WithAddressCodec(codec),
 			eventlog.WithSink(sink),
 		)
-		if err := svc.SubscribeAndSaveStrings("42", subscriberAddr, scope); err != nil {
+		if err := svc.SubscribeAndSaveStrings("42", subscriberAddr, scope, nil); err != nil {
 			t.Fatalf("subscribe(%s): %v", scope, err)
 		}
 		svc.OnBlock(rawLog.BlockNumber, "0xblock")
@@ -302,7 +302,7 @@ func TestE2E_ContractEvent_DeliveredEndToEnd(t *testing.T) {
 			eventlog.WithAddressCodec(codec),
 			eventlog.WithSink(sink),
 		)
-		if err := svc.SubscribeAndSaveStrings("42", c2, "managed_only"); err != nil {
+		if err := svc.SubscribeAndSaveStrings("42", c2, "managed_only", nil); err != nil {
 			t.Fatal(err)
 		}
 		svc.OnBlock(log2.BlockNumber, "0xblock2")

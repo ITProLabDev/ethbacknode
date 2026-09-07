@@ -1438,6 +1438,9 @@ subscribe time, not globally.
 > subscription still receives `contractEvent` as normal but **not**
 > `contractTransaction`. Extending `managed_only` to transactions (matched on
 > `from`/`to` instead of decoded event parameters) is planned but not built yet.
+> A `whole_contract` subscription can still narrow `contractTransaction` to
+> specific operations — see
+> [Filtering contractTransaction by operation](#filtering-contracttransaction-by-operation).
 
 ---
 
@@ -1533,8 +1536,15 @@ Subscriptions are **persistent** and resume after a restart.
 | serviceId | int | ✅ | The service that will receive the events (also used for auth) |
 | address | string | ✅ | The contract address to subscribe to (**must already be registered**) |
 | scope | string | ✅ | `whole_contract` or `managed_only` (see [Event scopes](#event-scopes)) |
+| selectors | array of string | optional | Raw 4-byte method selectors, `0x`-hex (e.g. `"0xa9059cbb"`) — narrows `contractTransaction` to only these operations. See [Filtering contractTransaction by operation](#filtering-contracttransaction-by-operation). |
+| methods | array of string | optional | Canonical method signatures (e.g. `"transfer(address,uint256)"`) — resolved to their selector the same way `selectors` works, just more ergonomic when you know the signature by name. May be combined with `selectors`. |
 
-#### Request Example
+Neither `selectors` nor `methods` given means **no filter**: every transaction
+sent to the contract is delivered, which is also today's behavior for a
+caller that never uses this. `contractEvent` is never filtered by selector —
+only `contractTransaction`.
+
+#### Request Example — plain subscribe (no operation filter)
 ```json
 {
   "id": 1,
@@ -1547,6 +1557,25 @@ Subscriptions are **persistent** and resume after a restart.
   }
 }
 ```
+
+#### Request Example — filtered to specific operations
+```json
+{
+  "id": 2,
+  "jsonrpc": "2.0",
+  "method": "contractSubscribe",
+  "params": {
+    "serviceId": 42,
+    "address": "0x3B5E7b8ac801EA77077b889fa7A778ABcBa38380",
+    "scope": "whole_contract",
+    "methods": ["swap(uint256,uint256,uint256,uint256,address)"],
+    "selectors": ["0xa9059cbb"]
+  }
+}
+```
+This subscription's `contractTransaction` notifications are limited to calls
+matching either `swap(...)`'s signature or the raw selector `0xa9059cbb` —
+nothing else sent to the contract is delivered.
 
 #### Response Example
 ```json
@@ -1569,7 +1598,45 @@ Subscriptions are **persistent** and resume after a restart.
 | `serviceId` or `address` missing | -32600 | `serviceId and address are required` |
 | Contract not registered | -32600 | `unknown contract: register its ABI before subscribing` |
 | Invalid `scope` | -32600 | `unknown event scope "…" (want whole_contract \| managed_only)` |
+| Malformed entry in `selectors` | -32600 | `selectors: "…": …` (not valid hex, or not exactly 4 bytes) |
 | Event subscriber not configured | -32000 | `event subscriber not configured` |
+
+---
+
+### Filtering contractTransaction by operation
+
+By default a `whole_contract` subscription's `contractTransaction` fires for
+**every** transaction sent to the contract — noisy for a busy contract like a
+DEX pool, where a subscriber usually cares about one kind of call (`swap`,
+say) and not routine admin calls or calls to every other method. `selectors`
+and `methods` narrow delivery to only the operations named.
+
+**Why by selector, not by method name.** A filter is matched against the
+transaction's raw 4-byte method selector (the first 4 bytes of its calldata),
+never against the decoded method name. Two differently-typed overloads of one
+name — `transfer(address,uint256)` and `transfer(address,uint256,bytes)` — are
+two different selectors; naming the bare string `"transfer"` would be
+ambiguous between them, so it is not accepted. Name a full signature (via
+`methods`) or the selector itself (via `selectors`) instead.
+
+**Why both forms exist.** `selectors` needs no ABI lookup at all — it works
+even for a method this node's registered ABI does not define, as long as you
+know the 4 bytes observed on-chain. `methods` is resolved to a selector the
+same way — a pure keccak256 hash of the signature string, no ABI lookup
+either — but is more ergonomic when you know the signature by name rather
+than its hash. Use either, or both together; they merge into one filter set.
+
+**Interaction with undecodable transactions.** A transaction whose selector
+matches the filter is delivered even if this node's registered ABI cannot
+decode it (see the `contractTransaction` unknown-method case) — filtering
+happens on the raw selector bytes, before decoding is attempted. A plain
+value transfer (no calldata at all) never matches a filtered subscription,
+since there is no selector to filter on; an **unfiltered** subscription still
+receives it, unchanged.
+
+**Not yet supported:** filtering `contractEvent` by event name/topic, and
+`managed_only` for `contractTransaction` — see the Future Phases note in
+`todo/TASKS.md`.
 
 ---
 
@@ -1671,7 +1738,14 @@ None.
     {
       "serviceId": "42",
       "address": "0x3b5e7b8ac801ea77077b889fa7a778abcba38380",
-      "scope": "managed_only"
+      "scope": "managed_only",
+      "selectors": []
+    },
+    {
+      "serviceId": "42",
+      "address": "0x9c5083dd4a6e1b2e4a3a2a5f2f2f2f2f2f2f2f2f",
+      "scope": "whole_contract",
+      "selectors": ["0xa9059cbb"]
     }
   ]
 }
@@ -1684,6 +1758,7 @@ None.
 | serviceId | string | The subscribed service id (as a string) |
 | address | string | The contract address (stored lowercased) |
 | scope | string | `whole_contract` or `managed_only` |
+| selectors | array of string | The `contractTransaction` operation filter, as raw `0x`-hex selectors (whatever mix of `selectors`/`methods` was given at subscribe time, always resolved to this one form). Empty means no filter — see [Filtering contractTransaction by operation](#filtering-contracttransaction-by-operation). |
 
 ---
 

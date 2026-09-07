@@ -181,9 +181,9 @@ type ContractAdder interface {
 // EventSubscriber is the subset of eventlog.Service the subscribe RPC needs.
 // Method names match *eventlog.Service exactly.
 type EventSubscriber interface {
-	SubscribeAndSaveStrings(serviceID, contractAddress, scope string) error
+	SubscribeAndSaveStrings(serviceID, contractAddress, scope string, selectors [][4]byte) error
 	UnsubscribeStrings(serviceID, contractAddress string) error
-	ListSubscriptions() []map[string]string
+	ListSubscriptions() []map[string]any
 }
 
 // WithAbiManager wires the contract registry/adder used by contract RPC methods.

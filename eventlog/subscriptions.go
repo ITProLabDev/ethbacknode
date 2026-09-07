@@ -41,6 +41,13 @@ type Subscription struct {
 	ServiceID       string
 	ContractAddress string
 	Scope           Scope
+
+	// Selectors filters contractTransaction delivery to only transactions
+	// whose method selector (the first 4 bytes of calldata) is in this set.
+	// Empty means no filter: every transaction to the contract matches, the
+	// pre-Milestone-8.1 behavior. contractEvent is unaffected -- this only
+	// gates contractTransaction.
+	Selectors [][4]byte
 }
 
 // subscriptionSet is a concurrency-safe in-memory set of subscriptions keyed by

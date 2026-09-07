@@ -49,6 +49,47 @@ func TestService_SubscribePersists(t *testing.T) {
 	}
 }
 
+func TestService_SubscribePersistsSelectors(t *testing.T) {
+	st := &memStore{}
+	svc := New(WithSubscriptionStorage(st))
+	sel := [4]byte{0xa9, 0x05, 0x9c, 0xbb}
+	if err := svc.SubscribeAndSave(&Subscription{
+		ServiceID: "s1", ContractAddress: "0xAA", Scope: ScopeWholeContract,
+		Selectors: [][4]byte{sel},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	svc2 := New(WithSubscriptionStorage(st))
+	if err := svc2.LoadSubscriptions(); err != nil {
+		t.Fatal(err)
+	}
+	subs := svc2.subs.forAddress("0xaa")
+	if len(subs) != 1 {
+		t.Fatalf("loaded subs=%+v", subs)
+	}
+	if len(subs[0].Selectors) != 1 || subs[0].Selectors[0] != sel {
+		t.Fatalf("selectors did not round-trip: got %x, want [%x]", subs[0].Selectors, sel)
+	}
+}
+
+func TestService_SubscribePersistsNoSelectorsAsEmpty(t *testing.T) {
+	st := &memStore{}
+	svc := New(WithSubscriptionStorage(st))
+	if err := svc.SubscribeAndSave(&Subscription{ServiceID: "s1", ContractAddress: "0xAA", Scope: ScopeWholeContract}); err != nil {
+		t.Fatal(err)
+	}
+
+	svc2 := New(WithSubscriptionStorage(st))
+	if err := svc2.LoadSubscriptions(); err != nil {
+		t.Fatal(err)
+	}
+	subs := svc2.subs.forAddress("0xaa")
+	if len(subs) != 1 || len(subs[0].Selectors) != 0 {
+		t.Fatalf("expected no selectors to round-trip as empty, got %+v", subs)
+	}
+}
+
 func TestService_LoadSubscriptions_EmptyStorage(t *testing.T) {
 	st := &memStore{} // never written
 	svc := New(WithSubscriptionStorage(st))
@@ -74,5 +115,14 @@ func TestService_LoadSubscriptions_BadScope(t *testing.T) {
 	svc := New(WithSubscriptionStorage(st))
 	if err := svc.LoadSubscriptions(); err == nil {
 		t.Fatal("bad scope in persisted data must error")
+	}
+}
+
+func TestService_LoadSubscriptions_BadSelectorHex(t *testing.T) {
+	badJSON := `[{"serviceId":"s1","contractAddress":"0xAA","scope":"whole_contract","selectors":["not-hex"]}]`
+	st := &memStore{data: []byte(badJSON), exists: true}
+	svc := New(WithSubscriptionStorage(st))
+	if err := svc.LoadSubscriptions(); err == nil {
+		t.Fatal("malformed selector hex in persisted data must error")
 	}
 }
