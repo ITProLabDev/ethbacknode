@@ -460,6 +460,31 @@ always present, empty when unfiltered) — its return type changed from
 two different operations to one contract in one block, only the subscribed
 one delivered), green under `-race`.
 
+### Milestone 8.2 — `uniclient` gains Smart Contract Layer coverage — ✅ DONE (2026-09-07)
+
+`uniclient` (`docs`: "unified JSON-RPC client for interacting with EthBackNode
+services", embedded as a library by other services — not imported anywhere in
+this repo) had **zero** coverage of the Smart Contract Layer despite it being
+the project's main feature area: no `contractRegister`/`contractSubscribe`/
+`contractUnsubscribe`/`contractList`/`contractSubscriptions`/`contractCall`.
+Found while auditing `uniclient`'s state against `endpoint/rpc_init.go`'s
+full registered-method list; also missing (deferred, see Future Phases):
+`ping`, `infoGetTokenList`, `addressSubscribe`/`addressRecover`/
+`addressGenerate`, and `serviceRegister`/`serviceConfig`
+(`methods_service.go` is a 1-line stub — consistent with the server's own
+`serviceRegister` being `panic("Not implemented")`).
+
+New `uniclient/methods_contracts.go`: all 6 methods, matching API.md exactly,
+including this session's `selectors`/`methods` operation filter on
+`ContractSubscribe` and the `Selectors` field on `ContractSubscriptionInfo`.
+`ContractCall` accepts `args` for forward-compatibility even though the
+server currently rejects a non-empty list. New `uniclient/methods_contracts_test.go`
+introduces a `fakeTransport` (the package's first mocked-transport tests —
+every existing method is only exercised by `client_test.go`'s `TestClient`,
+one integration test against a real server at `localhost:21280` with no
+skip guard, which is `docs/PROJECT_STATUS.md`'s known "needs a live node"
+failure and unaffected by this work). 9 new unit tests, green under `-race`.
+
 ---
 
 ## Future Phases (recorded, out of current scope)
@@ -479,6 +504,14 @@ one delivered), green under `-race`.
   event side).
 - **CTF write methods:** `splitPosition`, `mergePositions`, `redeemPositions`.
 - **Polymarket domain model:** markets, conditions, outcome tokens, position P&L.
+- **`uniclient` remaining method coverage (M8.2 follow-up):** `ping`,
+  `infoGetTokenList`, `addressSubscribe`/`addressRecover`/`addressGenerate`,
+  and `serviceRegister`/`serviceConfig` (the last two only once the server
+  side of `serviceRegister` is implemented — it is `panic("Not implemented")`
+  today). Also: give `client_test.go`'s `TestClient` a mocked-transport
+  counterpart (or a skip guard) so `go test ./uniclient/...` is not always
+  red without a live server — deferred behind Smart Contract Layer coverage
+  by the user's own priority call.
 
 ---
 
