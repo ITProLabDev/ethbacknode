@@ -407,6 +407,16 @@ under `-race`; not additionally verified against a live node (unlike the
 EIP-1559 signer above), since every collaborator here is internal Go already
 covered by fakes matching the real interfaces.
 
+**Docs and end-to-end coverage added 2026-09-07:** `API.md` documents it in
+full (new `## contractTransaction` section; updated `contractSubscribe`/
+`contractUnsubscribe`/scope docs — one subscription already yields both
+notification types, no separate subscribe endpoint).
+`endpoint/e2e_contract_transaction_test.go` (new, mirrors
+`e2e_contract_event_test.go`) exercises the real RPC-facing stack end to end:
+`SubscribeAndSaveStrings` → `OnBlock` → the actual delivered wire JSON, for a
+decoded call, an unknown selector, and confirming `managed_only` does not
+receive it.
+
 ---
 
 ## Future Phases (recorded, out of current scope)

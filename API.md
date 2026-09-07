@@ -52,16 +52,20 @@ The API is exposed via **JSON-RPC 2.0** and allows the client backend to interac
 ### Smart Contracts (Universal Contract Layer)
 
 Describe **any** smart contract by its standard JSON ABI, then receive its events
-and call its read-only view methods. Both `dot.case` and `camelCase` names work.
+**and** the transactions sent to it, and call its read-only view methods. Both
+`dot.case` and `camelCase` names work.
 
 - `contractRegister` — Register a contract + its ABI *(secured)*
-- `contractSubscribe` — Subscribe a service to a contract's events with a `scope` *(secured)*
-- `contractUnsubscribe` — Remove an event subscription *(secured)*
+- `contractSubscribe` — Subscribe a service to a contract's events **and**
+  transactions with a `scope` *(secured)*
+- `contractUnsubscribe` — Remove a subscription *(secured)*
 - `contractList` — List registered contracts (name → address)
-- `contractSubscriptions` — List active event subscriptions
+- `contractSubscriptions` — List active subscriptions
 - `contractCall` — Call a read-only view method, returns decoded outputs
 
-See the **[Smart Contract Layer](#smart-contract-layer)** section for full details.
+One `contractSubscribe` call yields **both** notification types — there is no
+separate subscribe step for transactions. See the
+**[Smart Contract Layer](#smart-contract-layer)** section for full details.
 
 ---
 
@@ -88,6 +92,17 @@ Event notifications are delivered asynchronously to the client backend via confi
   whose `scope` matched. Carries the event name, contract address, block/tx
   context, and the fully decoded parameters. See
   **[contractEvent](#contractevent)**.
+
+---
+
+### Contract Transactions
+
+- `contractTransaction` — A transaction sent directly to a subscribed contract,
+  delivered whether or not it emitted any event (including reverted calls).
+  Carries the transaction context, its outcome, and its call decoded by method
+  selector — plus the raw calldata either way. Delivered from the **same**
+  subscription as `contractEvent`, `whole_contract` scope only for now. See
+  **[contractTransaction](#contracttransaction)**.
 
 ---
 
@@ -1356,8 +1371,11 @@ or `solc`), and the service can then:
 
 1. **Decode and deliver its events** to your backend as `contractEvent`
    notifications (push, over your webhook).
-2. **Call its read-only view methods** on demand via `contractCall` (pull).
-3. **List** what is registered and what you are subscribed to.
+2. **Deliver every transaction sent to it** — decoded, whatever its outcome —
+   as `contractTransaction` notifications (push, same webhook, same
+   subscription as 1).
+3. **Call its read-only view methods** on demand via `contractCall` (pull).
+4. **List** what is registered and what you are subscribed to.
 
 > This is a **generic** engine. "Polymarket-class" (multi-token ERC-1155,
 > tuple/struct orders, rich events) only denotes the *complexity* it can handle;
@@ -1369,7 +1387,9 @@ or `solc`), and the service can then:
 1. contractRegister   — register the contract + its ABI            (once)
 2. serviceConfigSet    — make sure your eventUrl webhook is set     (once)
 3. contractSubscribe   — subscribe your serviceId with a scope      (once)
-   → from now on, matching events arrive at your webhook as `contractEvent`
+   → from now on, matching events arrive at your webhook as `contractEvent`,
+     and (whole_contract scope) every transaction to the contract arrives as
+     `contractTransaction` — one subscribe step, both notification types
 4. contractCall        — read view methods (totalSupply, …) anytime (on demand)
 ```
 
@@ -1384,10 +1404,10 @@ nothing. Register first, then subscribe.
 | Method (dot.case / camelCase) | Secured | Purpose |
 |-------------------------------|:-------:|---------|
 | `contract.register` / `contractRegister` | 🔒 | Register a contract + canonical JSON ABI |
-| `contract.subscribe` / `contractSubscribe` | 🔒 | Subscribe a `serviceId` to a contract's events with a `scope` |
+| `contract.subscribe` / `contractSubscribe` | 🔒 | Subscribe a `serviceId` to a contract's events **and** transactions with a `scope` |
 | `contract.unsubscribe` / `contractUnsubscribe` | 🔒 | Remove a subscription |
 | `contract.list` / `contractList` | open | List registered contracts (name → address) |
-| `contract.subscriptions` / `contractSubscriptions` | open | List active event subscriptions |
+| `contract.subscriptions` / `contractSubscriptions` | open | List active subscriptions |
 | `contract.call` / `contractCall` | open | Read-only view-method call → decoded outputs |
 
 🔒 **Secured** methods require a valid `serviceId` **and** the matching API token
@@ -1412,6 +1432,12 @@ reliably regardless of how the address casing appears on-chain.
 The two scopes can coexist: different services (or the same service on different
 contracts) may use different scopes. Scope is chosen per subscription at
 subscribe time, not globally.
+
+> **Scope and `contractTransaction`:** the table above describes `contractEvent`.
+> `contractTransaction` currently honors only `whole_contract` — a `managed_only`
+> subscription still receives `contractEvent` as normal but **not**
+> `contractTransaction`. Extending `managed_only` to transactions (matched on
+> `from`/`to` instead of decoded event parameters) is planned but not built yet.
 
 ---
 
@@ -1490,10 +1516,13 @@ deduplicated by address).
 
 ## contractSubscribe
 
-🔒 **Secured.** Subscribes an existing service to a registered contract's events.
-From this point, every event that matches your `scope` is pushed to your
-configured `eventUrl` as a `contractEvent` notification. Subscriptions are
-**persistent** and resume after a restart.
+🔒 **Secured.** Subscribes an existing service to a registered contract's
+events **and** transactions — one call, both notification types. From this
+point, every event that matches your `scope` is pushed to your configured
+`eventUrl` as a `contractEvent` notification, and (for `whole_contract` scope)
+every transaction sent to the contract is pushed as a `contractTransaction`
+notification — see [Scope and contractTransaction](#event-scopes).
+Subscriptions are **persistent** and resume after a restart.
 
 **Method:** `contractSubscribe` (alias `contract.subscribe`)
 
@@ -1546,8 +1575,9 @@ configured `eventUrl` as a `contractEvent` notification. Subscriptions are
 
 ## contractUnsubscribe
 
-🔒 **Secured.** Removes a service's subscription to a contract's events.
-Idempotent — removing a non-existent subscription is a no-op success.
+🔒 **Secured.** Removes a service's subscription to a contract — stops both
+`contractEvent` and `contractTransaction` delivery for it. Idempotent —
+removing a non-existent subscription is a no-op success.
 
 **Method:** `contractUnsubscribe` (alias `contract.unsubscribe`)
 
@@ -1785,10 +1815,106 @@ at-least-once semantics).
 
 ---
 
+## contractTransaction
+
+**Notification (push).** Delivered to a subscriber's configured `eventUrl` over
+HTTP POST as a JSON-RPC 2.0 notification, for **every transaction sent
+directly to** a subscribed contract (`to` equals the contract address) —
+regardless of whether it emitted any event, and regardless of whether it
+reverted. A method call with no logs, or one that failed, is invisible to
+`contractEvent`; `contractTransaction` is how you see it.
+
+Delivered from the **same** subscription as `contractEvent`
+(`{serviceId, address, scope}` from `contractSubscribe`) — there is no
+separate subscribe step. Currently only `whole_contract` subscriptions receive
+it; see [Scope and contractTransaction](#event-scopes).
+
+Delivery uses the **same webhook mechanism** as `blockEvent` /
+`transactionEvent` / `contractEvent` (see
+[Events & Webhooks](#events--webhooks) for the delivery model, ordering, and
+at-least-once semantics).
+
+#### Notification Example — decoded call
+```json
+{
+  "id": 1,
+  "jsonrpc": "2.0",
+  "method": "contractTransaction",
+  "params": {
+    "contract": "0x3B5E7b8ac801EA77077b889fa7A778ABcBa38380",
+    "blockNum": 20123456,
+    "txHash": "0x4b1edb1329619c67467fb916a0b78938eb878078ac59ba9afdd7a34b0646e02e",
+    "from": "0xa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3",
+    "to": "0x3B5E7b8ac801EA77077b889fa7A778ABcBa38380",
+    "value": "0",
+    "gas": 100000,
+    "gasUsed": 51423,
+    "success": true,
+    "method": "transfer",
+    "inputs": [
+      { "name": "to", "type": "address", "value": "0x101112131415161718191a1b1c1d1e1f20212223" },
+      { "name": "amount", "type": "uint256", "value": "1000000000000000000" }
+    ],
+    "data": "0xa9059cbb0000000000000000000000001011121314151617181920212223...000de0b6b3a7640000"
+  }
+}
+```
+
+#### Notification Example — unknown method
+The same shape, when the transaction's method selector matches nothing in the
+contract's registered ABI. `method` carries the raw 4-byte selector instead of
+a name, `inputs` is empty, and `data` (always present) is the only way to see
+what was actually sent:
+```json
+{
+  "method": "contractTransaction",
+  "params": {
+    "contract": "0x3B5E7b8ac801EA77077b889fa7A778ABcBa38380",
+    "...": "... same fields as above ...",
+    "method": "0xa9059cbb",
+    "inputs": [],
+    "data": "0xa9059cbb0000000000000000000000001011121314151617181920212223...000de0b6b3a7640000"
+  }
+}
+```
+
+#### Notification Parameters
+
+| Field | Type | Description |
+|-------|------|-------------|
+| contract | string | The called contract address (as registered) — same as `to` |
+| blockNum | int64 | Block number containing the transaction |
+| txHash | string | The transaction's hash |
+| from | string | Sender address |
+| to | string | Recipient address (the subscribed contract) |
+| value | string | Native-coin amount moved, in wei, as a **decimal string** (not a JSON number — see [Decoded value format](#decoded-value-format) for why) |
+| gas | int64 | Gas limit the transaction was sent with |
+| gasUsed | int64 | Gas actually consumed |
+| success | bool | `true` if the transaction succeeded, `false` if it reverted |
+| method | string | The decoded method name; the raw 4-byte selector as `0x`-hex (e.g. `"0xa9059cbb"`) if it matches no registered method; `""` if the transaction carried no calldata at all (a plain value transfer) |
+| inputs | array | The decoded call arguments in ABI order, empty when `method` did not decode — see [Decoded value format](#decoded-value-format) |
+| data | string | The raw calldata as `0x`-hex, **always present** regardless of whether `method`/`inputs` decoded — decode it yourself, or use it to double-check a decoded call |
+
+#### Notes
+
+- Delivered **once per matching subscription, per transaction**. If two
+  services subscribe `whole_contract` to the same contract, each receives its
+  own `contractTransaction`.
+- A reverted transaction (`success: false`) is delivered like any other — it
+  still called the contract and still cost gas. It is not treated as an error.
+- `managed_only` subscriptions do **not** receive `contractTransaction` today
+  — see [Scope and contractTransaction](#event-scopes).
+- Delivery is **at-least-once**; deduplicate using `txHash`, which is unique
+  per transaction (unlike `contractEvent`, there is no `logIndex` — a
+  transaction produces at most one `contractTransaction` per subscription).
+
+---
+
 ## Decoded value format
 
-Both `contractEvent.inputs[]` and `contractCall` results are arrays of **decoded
-values**. Every decoded value has this shape:
+`contractEvent.inputs[]`, `contractTransaction.inputs[]`, and `contractCall`
+results are all arrays of **decoded values**. Every decoded value has this
+shape:
 
 ```json
 { "name": "value", "type": "uint256", "value": <encoded> }
