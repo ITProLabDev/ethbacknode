@@ -485,6 +485,37 @@ one integration test against a real server at `localhost:21280` with no
 skip guard, which is `docs/PROJECT_STATUS.md`'s known "needs a live node"
 failure and unaffected by this work). 9 new unit tests, green under `-race`.
 
+### Milestone 8.3 — `uniclient` gains the remaining non-contract methods — ✅ DONE (2026-09-07)
+
+Closes the rest of the gap M8.2 found, except `serviceRegister` (still
+unimplemented server-side — see below). Added to the existing
+`methods_info.go`/`methods_address.go` and filled in the previously 1-line
+`methods_service.go`:
+
+- `Ping()`, `InfoGetTokenList()` — open, no auth.
+- `AddressSubscribe(addr, privateKeyHex, mnemonic, userId, invoiceId,
+  watchOnly)` — one method covering all three ways the server's
+  `addressSubscribe` accepts an address (existing address watch-only, a
+  private key, or a BIP-39 mnemonic), matching the request shape in
+  `endpoint/methods_address.go` directly rather than three separate wrappers.
+- `AddressRecover(mnemonic)`, `AddressGenerate(mnemonicLen)` — share one
+  result type (`MnemonicAddressResult`) since the server answers both with
+  the same shape; `AddressGenerate(0)` defaults to 12 words, matching the
+  server's own default.
+- `ServiceConfig(cfg)` — secured; `serviceRegister` (which would create the
+  service `ServiceConfig` then edits) has no client method and cannot get one
+  until the server stops `panic`-ing there.
+
+**Important, and true of AddressSubscribe/AddressRecover/AddressGenerate
+specifically:** the server reports *domain* failures (bad address, bad
+mnemonic) inside the JSON result (`success: false`, `error: "..."`), not as a
+JSON-RPC error — these client methods deliberately return that result as-is
+rather than translating `success: false` into a Go `error`, matching the
+server's own contract. A transport failure or a genuine JSON-RPC error (bad
+params, auth) is still a Go `error`, as everywhere else in this package.
+
+10 new unit tests (all via `fakeTransport`), green under `-race`.
+
 ---
 
 ## Future Phases (recorded, out of current scope)
@@ -504,14 +535,14 @@ failure and unaffected by this work). 9 new unit tests, green under `-race`.
   event side).
 - **CTF write methods:** `splitPosition`, `mergePositions`, `redeemPositions`.
 - **Polymarket domain model:** markets, conditions, outcome tokens, position P&L.
-- **`uniclient` remaining method coverage (M8.2 follow-up):** `ping`,
-  `infoGetTokenList`, `addressSubscribe`/`addressRecover`/`addressGenerate`,
-  and `serviceRegister`/`serviceConfig` (the last two only once the server
-  side of `serviceRegister` is implemented — it is `panic("Not implemented")`
-  today). Also: give `client_test.go`'s `TestClient` a mocked-transport
-  counterpart (or a skip guard) so `go test ./uniclient/...` is not always
-  red without a live server — deferred behind Smart Contract Layer coverage
-  by the user's own priority call.
+- **`uniclient` remaining gap:** `serviceRegister` has no client method, and
+  cannot get one until the server side stops being `panic("Not implemented")`
+  (see `endpoint/methods_subscribers.go`) — wrapping a call that crashes the
+  server is worse than not offering it. `ping`, `infoGetTokenList`,
+  `addressSubscribe`/`addressRecover`/`addressGenerate`, and `serviceConfig`
+  landed in M8.3. Also still open: give `client_test.go`'s `TestClient` a
+  mocked-transport counterpart (or a skip guard) so `go test
+  ./uniclient/...` is not always red without a live server.
 
 ---
 
